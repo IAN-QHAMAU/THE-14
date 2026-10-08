@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   title: 'THE 14',
   description: 'Kwani me hudoo!!',
   icons: [
-    { rel: 'icon', url: '/icon-192.png' },
+    { rel: 'icon', url: '/favicon.png' },
     { rel: 'apple-touch-icon', url: '/icon-192.png' },
   ],
 }
