@@ -233,7 +233,7 @@ export default function GMControlPage() {
           )}
 
           {/* Quiz controls */}
-          {game.status !== 'waiting' && game.status !== 'finished' && (
+          {!(['waiting', 'finished'] as string[]).includes(game.status) && (
             <div className="grid grid-cols-2 gap-2">
               {(game.status === 'category') && (
                 <Button
@@ -276,7 +276,7 @@ export default function GMControlPage() {
             </div>
           )}
 
-          {game.status === 'finished' && (
+          {(game.status as string) === 'finished' && (
             <div className="p-4 bg-stone-900 text-stone-50 text-center">
               <p className="text-sm font-medium">Game over.</p>
               <p className="text-xs text-stone-400 mt-1">Players are seeing the final leaderboard.</p>
