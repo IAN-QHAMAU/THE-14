@@ -1,36 +1,37 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/db/supabase'
 import { subscribeToGame, subscribeToPlayers, subscribeToRounds, subscribeToEvents } from '@/lib/realtime/subscriptions'
 import { WaitingRoom } from '@/components/game/WaitingRoom'
-import { Briefing } from '@/components/game/Briefing'
-import { RoundActive } from '@/components/game/RoundActive'
-import { RoundReveal } from '@/components/game/RoundReveal'
-import { FinalResults } from '@/components/game/FinalResults'
-import { LiveEvent } from '@/components/game/LiveEvent'
-import type { Game, Player, Round, PlayerRole, RoundAssignment, GameEvent } from '@/types'
+import { CategoryReveal } from '@/components/game/CategoryReveal'
+import { QuestionScreen } from '@/components/game/QuestionScreen'
+import { QuestionResult } from '@/components/game/QuestionResult'
+import { Podium } from '@/components/game/Podium'
+import type { Game, Player, Round, GameEvent, AnswerStat, PlayerScoreEntry } from '@/types'
+import type { Question } from '@/lib/game/questions'
 
 interface StateData {
   game: Game
   players: Player[]
   myPlayer: Player | null
-  myRole: PlayerRole | null
-  myAssignment: RoundAssignment | null
   currentRound: Round | null
+  currentQuestion: (Question & { correct: number }) | null
   submitted: boolean
-  revealData: { teamA: number; teamB: number; submissionCount: number } | null
+  selectedOption: number | null
+  revealData: { correct_index: number; answer_stats: AnswerStat[] } | null
+  scores: PlayerScoreEntry[]
+  myRank: number
+  myScore: number
   events: GameEvent[]
-  scores: { player_id: string; name: string; total: number }[]
   isGameMaster: boolean
 }
 
 export default function RoomPage() {
   const router = useRouter()
   const [state, setState] = useState<StateData | null>(null)
-  const [briefingDone, setBriefingDone] = useState(false)
-  const [latestEvent, setLatestEvent] = useState<GameEvent | null>(null)
   const [error, setError] = useState('')
+  const questionStartRef = useRef<number>(Date.now())
 
   const fetchState = useCallback(async () => {
     const res = await fetch('/api/game/state')
@@ -40,35 +41,34 @@ export default function RoomPage() {
     setState(data)
   }, [router])
 
+  useEffect(() => { fetchState() }, [fetchState])
+
+  // Track when question changes to measure response time
   useEffect(() => {
-    fetchState()
-  }, [fetchState])
+    if (state?.currentRound?.status === 'active') {
+      questionStartRef.current = Date.now()
+    }
+  }, [state?.currentRound?.id, state?.currentRound?.status])
 
   useEffect(() => {
     if (!state?.game?.id) return
-    const gameId = state.game.id
+    const gid = state.game.id
 
-    const gameSub = subscribeToGame(gameId, () => fetchState())
-    const playerSub = subscribeToPlayers(gameId, () => fetchState())
-    const roundSub = subscribeToRounds(gameId, () => fetchState())
-    const eventSub = subscribeToEvents(gameId, (ev) => {
-      setLatestEvent(ev)
-      fetchState()
-    })
-
-    return () => {
-      supabase.removeChannel(gameSub)
-      supabase.removeChannel(playerSub)
-      supabase.removeChannel(roundSub)
-      supabase.removeChannel(eventSub)
-    }
+    const subs = [
+      subscribeToGame(gid, () => fetchState()),
+      subscribeToPlayers(gid, () => fetchState()),
+      subscribeToRounds(gid, () => fetchState()),
+      subscribeToEvents(gid, () => fetchState()),
+    ]
+    return () => subs.forEach((s) => supabase.removeChannel(s))
   }, [state?.game?.id, fetchState])
 
-  async function handleSubmit(payload: Record<string, unknown>) {
+  async function handleAnswer(optionIndex: number) {
+    const timeTakenMs = Date.now() - questionStartRef.current
     const res = await fetch('/api/action/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actionType: 'choice', payload }),
+      body: JSON.stringify({ optionIndex, timeTakenMs }),
     })
     if (!res.ok) {
       const d = await res.json()
@@ -98,72 +98,70 @@ export default function RoomPage() {
     )
   }
 
-  const { game, players, myPlayer, myRole, myAssignment, currentRound, submitted, revealData, scores } = state
+  const {
+    game, players, myPlayer, currentRound, currentQuestion,
+    submitted, selectedOption, revealData, scores, myRank, myScore,
+  } = state
 
-  // Route GM to their interface
+  // Redirect GM
   if (state.isGameMaster) {
     router.push('/gm/control')
     return null
   }
 
-  // State machine rendering
+  // ── State machine ──────────────────────────────────────────────
+
   if (game.status === 'waiting') {
     return <WaitingRoom game={game} players={players} myPlayer={myPlayer} />
   }
 
-  if (game.status === 'briefing' && myRole && !briefingDone) {
-    return <Briefing role={myRole} onReady={() => setBriefingDone(true)} />
+  if (game.status === 'finished') {
+    return <Podium scores={scores} myPlayerId={myPlayer?.id ?? ''} />
   }
 
-  if (game.status === 'finished') {
+  if (game.status === 'question_result' && currentQuestion && revealData) {
+    const answerStats: AnswerStat[] = revealData.answer_stats ?? []
     return (
-      <FinalResults
-        scores={scores}
-        myPlayerId={myPlayer?.id ?? ''}
-        myRole={myRole}
+      <QuestionResult
+        question={{ ...currentQuestion, correct: revealData.correct_index }}
+        selectedOption={selectedOption}
+        pointsEarned={0}
+        answerStats={answerStats}
+        myRank={myRank}
+        totalPlayers={players.filter((p) => !p.is_game_master).length}
+        myScore={myScore}
       />
     )
   }
 
-  if (currentRound?.status === 'revealing' || currentRound?.status === 'complete') {
+  if (game.status === 'active' && currentRound?.status === 'active' && currentQuestion) {
     return (
-      <>
-        <RoundReveal round={currentRound} revealData={revealData} assignment={myAssignment} />
-        <LiveEvent event={latestEvent} />
-      </>
+      <QuestionScreen
+        question={currentQuestion}
+        questionNumber={currentRound.round_number}
+        totalQuestions={game.total_questions}
+        submitted={submitted}
+        selectedOption={selectedOption}
+        endsAt={currentRound.ends_at ?? new Date(Date.now() + 20000).toISOString()}
+        onAnswer={handleAnswer}
+      />
     )
   }
 
-  if (currentRound?.status === 'active') {
-    return (
-      <>
-        <RoundActive
-          round={currentRound}
-          assignment={myAssignment}
-          submitted={submitted}
-          onSubmit={handleSubmit}
-        />
-        <LiveEvent event={latestEvent} />
-      </>
-    )
-  }
-
-  // Briefing done, waiting for round to start
+  // Category reveal / between questions
   return (
     <main className="min-h-screen bg-stone-50 flex items-center justify-center px-6">
-      <div className="text-center space-y-3 max-w-xs">
-        <p className="text-sm font-medium text-stone-700">
-          {currentRound?.status === 'briefing' || currentRound?.status === 'locked'
-            ? 'Round in progress. Hold tight.'
-            : 'Waiting for the next round.'}
-        </p>
-        {currentRound && (
-          <p className="text-xs text-stone-400">
-            Round {currentRound.round_number} — {currentRound.title}
-          </p>
-        )}
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-stone-400 animate-pulse" />
-      </div>
+      {game.category ? (
+        <CategoryReveal
+          category={game.category}
+          totalQuestions={game.total_questions}
+        />
+      ) : (
+        <div className="text-center space-y-2">
+          <p className="text-sm text-stone-500">Waiting for the game to begin…</p>
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-stone-400 animate-pulse" />
+        </div>
+      )}
     </main>
   )
 }

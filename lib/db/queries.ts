@@ -1,5 +1,5 @@
 import { createServerSupabase } from './supabase'
-import type { Game, Player, Round, PlayerRole, RoundAssignment, GameEvent } from '@/types'
+import type { Game, Player, Round, GameEvent, PlayerScoreEntry } from '@/types'
 
 export async function getGameByCode(code: string): Promise<Game | null> {
   const db = createServerSupabase()
@@ -35,11 +35,12 @@ export async function getPlayer(playerId: string): Promise<Player | null> {
 
 export async function getCurrentRound(gameId: string): Promise<Round | null> {
   const db = createServerSupabase()
+  // Get active or revealing round
   const { data } = await db
     .from('rounds')
     .select('*')
     .eq('game_id', gameId)
-    .not('status', 'eq', 'complete')
+    .in('status', ['active', 'locked', 'revealing'])
     .order('round_number')
     .limit(1)
     .single()
@@ -56,32 +57,7 @@ export async function getRounds(gameId: string): Promise<Round[]> {
   return data ?? []
 }
 
-export async function getPlayerRole(playerId: string, gameId: string): Promise<PlayerRole | null> {
-  const db = createServerSupabase()
-  const { data } = await db
-    .from('player_roles')
-    .select('*')
-    .eq('player_id', playerId)
-    .eq('game_id', gameId)
-    .single()
-  return data
-}
-
-export async function getRoundAssignment(
-  roundId: string,
-  playerId: string
-): Promise<RoundAssignment | null> {
-  const db = createServerSupabase()
-  const { data } = await db
-    .from('round_assignments')
-    .select('*')
-    .eq('round_id', roundId)
-    .eq('player_id', playerId)
-    .single()
-  return data
-}
-
-export async function hasPlayerSubmitted(roundId: string, playerId: string): Promise<boolean> {
+export async function hasPlayerAnswered(roundId: string, playerId: string): Promise<boolean> {
   const db = createServerSupabase()
   const { data } = await db
     .from('actions')
@@ -92,20 +68,49 @@ export async function hasPlayerSubmitted(roundId: string, playerId: string): Pro
   return (data?.length ?? 0) > 0
 }
 
-export async function getPlayerScores(gameId: string): Promise<
-  { player_id: string; name: string; total: number }[]
-> {
+export async function getPlayerAnswer(
+  roundId: string,
+  playerId: string
+): Promise<number | null> {
   const db = createServerSupabase()
-  const { data: players } = await db
+  const { data } = await db
+    .from('actions')
+    .select('payload')
+    .eq('round_id', roundId)
+    .eq('player_id', playerId)
+    .single()
+  if (!data) return null
+  return (data.payload as { option_index: number }).option_index ?? null
+}
+
+export async function getRevealData(roundId: string) {
+  const db = createServerSupabase()
+  const { data: event } = await db
+    .from('events')
+    .select('payload')
+    .eq('round_id', roundId)
+    .eq('event_type', 'reveal_triggered')
+    .single()
+  return event?.payload ?? null
+}
+
+export async function getPlayerScores(gameId: string): Promise<PlayerScoreEntry[]> {
+  const db = createServerSupabase()
+  const { data } = await db
     .from('players')
-    .select('id, name, score')
+    .select('id, name, avatar, score')
     .eq('game_id', gameId)
     .eq('is_game_master', false)
     .order('score', { ascending: false })
-  return (players ?? []).map((p) => ({ player_id: p.id, name: p.name, total: p.score }))
+  return (data ?? []).map((p) => ({
+    player_id: p.id,
+    name: p.name,
+    avatar: p.avatar ?? 'ninja',
+    total: p.score,
+  }))
 }
 
-export async function getGameEvents(gameId: string, limit = 50): Promise<GameEvent[]> {
+export async function getGameEvents(gameId: string, limit = 30): Promise<GameEvent[]> {
   const db = createServerSupabase()
   const { data } = await db
     .from('events')
@@ -126,7 +131,6 @@ export async function getSubmissionStatus(
     .select('player_id')
     .eq('round_id', roundId)
     .in('player_id', playerIds)
-
   const submitted = new Set((data ?? []).map((a) => a.player_id))
   return Object.fromEntries(playerIds.map((id) => [id, submitted.has(id)]))
 }

@@ -1,44 +1,59 @@
 import { createServerSupabase } from '@/lib/db/supabase'
+import { QUESTIONS, getQuestionsForCategory, type Category } from '@/lib/game/questions'
 import type { GameStatus, RoundStatus } from '@/types'
 
 const db = () => createServerSupabase()
 
 // ─── Game transitions ──────────────────────────────────────────────────────
 
-export async function startGame(gameId: string) {
+export async function setupGame(gameId: string, category: Category, questionCount: number) {
   const client = db()
+
+  const questions = getQuestionsForCategory(category, questionCount)
+
+  // Store selected questions as rounds
+  await client.from('rounds').delete().eq('game_id', gameId)
+  await client.from('rounds').insert(
+    questions.map((q, i) => ({
+      game_id: gameId,
+      round_number: i + 1,
+      title: `Question ${i + 1}`,
+      description: q.question,
+      question_id: q.id,
+      status: 'pending' as RoundStatus,
+    }))
+  )
+
   await client
     .from('games')
-    .update({ status: 'briefing' as GameStatus, started_at: new Date().toISOString() })
+    .update({
+      status: 'category' as GameStatus,
+      category,
+      total_questions: questions.length,
+      started_at: new Date().toISOString(),
+    })
     .eq('id', gameId)
 
-  await logEvent(gameId, null, 'game_started', null, null, {})
+  await logEvent(gameId, null, 'game_started', null, null, { category, questionCount })
 }
 
-export async function advanceGameToActive(gameId: string) {
+export async function startNextQuestion(gameId: string) {
   const client = db()
-  await client
-    .from('games')
-    .update({ status: 'active' as GameStatus })
-    .eq('id', gameId)
-}
 
-export async function endGame(gameId: string) {
-  const client = db()
-  await client
-    .from('games')
-    .update({ status: 'finished' as GameStatus, ended_at: new Date().toISOString() })
-    .eq('id', gameId)
+  // Find next pending round
+  const { data: rounds } = await client
+    .from('rounds')
+    .select('*')
+    .eq('game_id', gameId)
+    .eq('status', 'pending')
+    .order('round_number')
+    .limit(1)
 
-  await logEvent(gameId, null, 'game_ended', null, null, {})
-}
+  const round = rounds?.[0]
+  if (!round) return null
 
-// ─── Round transitions ─────────────────────────────────────────────────────
-
-export async function startRound(roundId: string, gameId: string, durationSeconds = 120) {
-  const client = db()
   const now = new Date()
-  const ends = new Date(now.getTime() + durationSeconds * 1000)
+  const ends = new Date(now.getTime() + 20 * 1000) // 20 seconds per question
 
   await client
     .from('rounds')
@@ -47,48 +62,122 @@ export async function startRound(roundId: string, gameId: string, durationSecond
       starts_at: now.toISOString(),
       ends_at: ends.toISOString(),
     })
-    .eq('id', roundId)
-
-  await logEvent(gameId, roundId, 'round_started', null, null, { round_id: roundId })
-}
-
-export async function lockRound(roundId: string, gameId: string) {
-  const client = db()
-  await client
-    .from('rounds')
-    .update({ status: 'locked' as RoundStatus })
-    .eq('id', roundId)
-
-  await logEvent(gameId, roundId, 'round_locked', null, null, {})
-}
-
-export async function revealRound(roundId: string, gameId: string) {
-  const client = db()
-  await client
-    .from('rounds')
-    .update({ status: 'revealing' as RoundStatus })
-    .eq('id', roundId)
-
-  await logEvent(gameId, roundId, 'reveal_triggered', null, null, {})
-}
-
-export async function completeRound(roundId: string, gameId: string) {
-  const client = db()
-
-  // Get round number
-  const { data: round } = await client.from('rounds').select('round_number').eq('id', roundId).single()
-
-  await client
-    .from('rounds')
-    .update({ status: 'complete' as RoundStatus })
-    .eq('id', roundId)
+    .eq('id', round.id)
 
   await client
     .from('games')
-    .update({ current_round: (round?.round_number ?? 0) + 1 })
+    .update({ status: 'active' as GameStatus, current_round: round.round_number })
     .eq('id', gameId)
 
-  await logEvent(gameId, roundId, 'round_completed', null, null, {})
+  await logEvent(gameId, round.id, 'round_started', null, null, {
+    question_id: round.question_id,
+    round_number: round.round_number,
+  })
+
+  return round
+}
+
+export async function lockAndRevealQuestion(roundId: string, gameId: string) {
+  const client = db()
+
+  // Lock round
+  await client.from('rounds').update({ status: 'locked' as RoundStatus }).eq('id', roundId)
+
+  // Get round info
+  const { data: round } = await client
+    .from('rounds')
+    .select('question_id, round_number')
+    .eq('id', roundId)
+    .single()
+
+  if (!round) return
+
+  // Get the question
+  const allQuestions = Object.values(QUESTIONS).flat()
+  const question = allQuestions.find((q) => q.id === round.question_id)
+  if (!question) return
+
+  // Get all answers
+  const { data: actions } = await client
+    .from('actions')
+    .select('player_id, payload, created_at')
+    .eq('round_id', roundId)
+
+  const answers = actions ?? []
+  const totalAnswers = answers.length
+
+  // Tally stats
+  const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 }
+  for (const a of answers) {
+    const p = a.payload as { option_index: number }
+    counts[p.option_index] = (counts[p.option_index] ?? 0) + 1
+  }
+
+  const answerStats = [0, 1, 2, 3].map((idx) => ({
+    optionIndex: idx,
+    count: counts[idx] ?? 0,
+    percentage: totalAnswers > 0 ? ((counts[idx] ?? 0) / totalAnswers) * 100 : 0,
+  }))
+
+  // Sort correct answers by speed for bonus
+  const correctAnswers = answers
+    .filter((a) => (a.payload as { option_index: number }).option_index === question.correct)
+    .sort((a, b) => {
+      const ta = (a.payload as { time_taken_ms: number }).time_taken_ms ?? 99999
+      const tb = (b.payload as { time_taken_ms: number }).time_taken_ms ?? 99999
+      return ta - tb
+    })
+
+  // Award points
+  for (let i = 0; i < correctAnswers.length; i++) {
+    const action = correctAnswers[i]
+    let pts = question.points
+    // Speed bonus: full bonus for 1st, half for 2nd, quarter for 3rd
+    if (i === 0) pts += question.speedBonus
+    else if (i === 1) pts += Math.floor(question.speedBonus / 2)
+    else if (i === 2) pts += Math.floor(question.speedBonus / 4)
+
+    await awardPoints(gameId, action.player_id, roundId, pts, `Correct answer Q${round.round_number}`)
+  }
+
+  // Mark round as revealing
+  await client.from('rounds').update({ status: 'revealing' as RoundStatus }).eq('id', roundId)
+  await client.from('games').update({ status: 'question_result' as GameStatus }).eq('id', gameId)
+
+  await logEvent(gameId, roundId, 'reveal_triggered', null, null, {
+    question_id: round.question_id,
+    correct_index: question.correct,
+    answer_stats: answerStats,
+  })
+
+  return { answerStats, correctIndex: question.correct }
+}
+
+export async function completeQuestion(roundId: string, gameId: string) {
+  const client = db()
+  await client.from('rounds').update({ status: 'complete' as RoundStatus }).eq('id', roundId)
+
+  // Check if more questions remain
+  const { data: pending } = await client
+    .from('rounds')
+    .select('id')
+    .eq('game_id', gameId)
+    .eq('status', 'pending')
+    .limit(1)
+
+  if (!pending?.length) {
+    // No more questions — end game
+    await client.from('games').update({
+      status: 'finished' as GameStatus,
+      ended_at: new Date().toISOString(),
+    }).eq('id', gameId)
+    await logEvent(gameId, null, 'game_ended', null, null, {})
+    return 'finished'
+  }
+
+  // Ready for next question
+  await client.from('games').update({ status: 'category' as GameStatus }).eq('id', gameId)
+  return 'next'
 }
 
 // ─── Scoring ───────────────────────────────────────────────────────────────
@@ -102,15 +191,8 @@ export async function awardPoints(
 ) {
   const client = db()
   await client.from('scores').insert({ game_id: gameId, player_id: playerId, round_id: roundId, points, reason })
-
-  // Update cumulative score
   const { data: player } = await client.from('players').select('score').eq('id', playerId).single()
-  await client
-    .from('players')
-    .update({ score: (player?.score ?? 0) + points })
-    .eq('id', playerId)
-
-  await logEvent(gameId, roundId, 'score_changed', playerId, null, { points, reason })
+  await client.from('players').update({ score: (player?.score ?? 0) + points }).eq('id', playerId)
 }
 
 // ─── Events ────────────────────────────────────────────────────────────────
@@ -133,110 +215,3 @@ export async function logEvent(
     payload,
   })
 }
-
-// ─── Default game setup ────────────────────────────────────────────────────
-
-export const DEFAULT_ROLES = [
-  {
-    role_name: 'The Broker',
-    secret_objective: 'Ensure Team B receives more than 500 points in any round.',
-    private_information: 'You know that two other players are secretly on Team B.',
-    special_ability: 'Once per game, you may double your vote weight.',
-  },
-  {
-    role_name: 'The Analyst',
-    secret_objective: 'Correctly predict the outcome of two rounds.',
-    private_information: 'You can see the total votes cast before others.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Disruptor',
-    secret_objective: 'Cause at least one round to end in a tie.',
-    private_information: 'You know who the Broker is.',
-    special_ability: 'Once per game, you may cancel one vote.',
-  },
-  {
-    role_name: 'The Loyalist',
-    secret_objective: 'Always vote with the majority. Score 50 points per aligned round.',
-    private_information: 'None. You play in the open.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Shadow',
-    secret_objective: 'Never be correctly accused by another player.',
-    private_information: 'You know one other player\'s objective.',
-    special_ability: 'Once per game, you may pass your turn invisibly.',
-  },
-  {
-    role_name: 'The Architect',
-    secret_objective: 'Ensure the final score gap between first and last is under 100 points.',
-    private_information: 'You see the current leaderboard at all times.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Envoy',
-    secret_objective: 'Form an alliance with another player and both must score above 200.',
-    private_information: 'You may send one anonymous message per round.',
-    special_ability: 'Send one private message per round.',
-  },
-  {
-    role_name: 'The Auditor',
-    secret_objective: 'Identify the Broker before the final round.',
-    private_information: 'You see all vote totals (not who voted).',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Contrarian',
-    secret_objective: 'Vote against the majority in at least two rounds.',
-    private_information: 'None.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Insider',
-    secret_objective: 'Team B must win two out of three rounds.',
-    private_information: 'You know the identity of The Broker.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Watcher',
-    secret_objective: 'Accumulate the most points without ever being accused.',
-    private_information: 'You see who accuses whom in real time.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Mediator',
-    secret_objective: 'Prevent any single player from winning by more than 150 points.',
-    private_information: 'You know the top scorer after each round.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Phantom',
-    secret_objective: 'Never submit first in any round.',
-    private_information: 'You see submission order in real time.',
-    special_ability: null,
-  },
-  {
-    role_name: 'The Catalyst',
-    secret_objective: 'Trigger at least two live events during the game.',
-    private_information: 'You have two secret action tokens.',
-    special_ability: 'Trigger a secret action twice per game.',
-  },
-]
-
-export const DEFAULT_ROUNDS = [
-  {
-    round_number: 1,
-    title: 'THE SPLIT',
-    description: 'Your group must divide 1,000 points between Team A and Team B. Majority rules — but not everyone wants the same outcome.',
-  },
-  {
-    round_number: 2,
-    title: 'THE VOTE',
-    description: 'Each player votes to eliminate one of three proposals. The surviving proposal becomes group policy — and scores points differently for different players.',
-  },
-  {
-    round_number: 3,
-    title: 'THE FINAL HAND',
-    description: 'Each player secretly allocates their remaining tokens. Hidden agendas collide. The final reveal determines everything.',
-  },
-]

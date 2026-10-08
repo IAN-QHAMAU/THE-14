@@ -4,13 +4,14 @@ import {
   getGameById,
   getPlayers,
   getCurrentRound,
-  getPlayerRole,
-  getRoundAssignment,
-  hasPlayerSubmitted,
+  hasPlayerAnswered,
+  getPlayerAnswer,
   getPlayerScores,
   getGameEvents,
+  getRevealData,
+  getSubmissionStatus,
 } from '@/lib/db/queries'
-import { createServerSupabase } from '@/lib/db/supabase'
+import { QUESTIONS } from '@/lib/game/questions'
 
 export async function GET() {
   const session = await getSession()
@@ -30,80 +31,86 @@ export async function GET() {
 
   const myPlayer = players.find((p) => p.id === playerId) ?? null
 
-  // Only fetch private role info for the requesting player (never expose others)
-  const myRole = !isGameMaster ? await getPlayerRole(playerId, gameId) : null
-  const myAssignment = round && !isGameMaster
-    ? await getRoundAssignment(round.id, playerId)
-    : null
-  const submitted = round && !isGameMaster
-    ? await hasPlayerSubmitted(round.id, playerId)
-    : false
-
-  // Strip sensitive fields from other players
+  // Strip sensitive fields from players list
   const safePlayers = players.map((p) => ({
     id: p.id,
     name: p.name,
+    avatar: p.avatar ?? 'ninja',
     is_game_master: p.is_game_master,
     is_connected: p.is_connected,
     score: p.score,
     status: p.status,
   }))
 
-  // GM gets submission status per player
+  // Player's answer for current round
+  const submitted = round && !isGameMaster
+    ? await hasPlayerAnswered(round.id, playerId)
+    : false
+
+  const selectedOption = round && !isGameMaster && submitted
+    ? await getPlayerAnswer(round.id, playerId)
+    : null
+
+  // GM submission tracking
   let submissionStatus: Record<string, boolean> = {}
   if (isGameMaster && round) {
-    const db = createServerSupabase()
-    const { data: actions } = await db
-      .from('actions')
-      .select('player_id')
-      .eq('round_id', round.id)
-    const submitted = new Set((actions ?? []).map((a) => a.player_id))
     const realPlayers = players.filter((p) => !p.is_game_master)
-    submissionStatus = Object.fromEntries(realPlayers.map((p) => [p.id, submitted.has(p.id)]))
+    submissionStatus = await getSubmissionStatus(round.id, realPlayers.map((p) => p.id))
   }
 
-  // Reveal data (only during revealing/finished states)
-  let revealData = null
-  if (round && (round.status === 'revealing' || round.status === 'complete') && !isGameMaster) {
-    const db = createServerSupabase()
-    const { data: actions } = await db
-      .from('actions')
-      .select('payload')
-      .eq('round_id', round.id)
-
-    if (actions?.length) {
-      const splits = actions.map((a) => {
-        const p = a.payload as Record<string, number>
-        return { teamA: p.teamA ?? 500, teamB: p.teamB ?? 500 }
-      })
-      const totalA = splits.reduce((s, x) => s + x.teamA, 0)
-      const totalB = splits.reduce((s, x) => s + x.teamB, 0)
-      const count = splits.length
-      revealData = {
-        teamA: Math.round(totalA / count),
-        teamB: Math.round(totalB / count),
-        submissionCount: count,
+  // Current question (safe to send — no answer revealed until reveal phase)
+  let currentQuestion = null
+  if (round?.question_id) {
+    const allQuestions = Object.values(QUESTIONS).flat()
+    const q = allQuestions.find((q) => q.id === round.question_id)
+    if (q) {
+      // Never send the correct answer index until revealing
+      const isRevealing = round.status === 'revealing' || game.status === 'question_result'
+      currentQuestion = {
+        id: q.id,
+        category: q.category,
+        question: q.question,
+        options: q.options,
+        points: q.points,
+        speedBonus: q.speedBonus,
+        // Only send correct answer during reveal
+        correct: isRevealing ? q.correct : -1,
       }
     }
   }
 
-  const events = await getGameEvents(gameId, 20)
-  const scores = game.status === 'finished' || game.status === 'revealing'
+  // Reveal data (answer stats from event log)
+  let revealData = null
+  if (round && (round.status === 'revealing') && round.id) {
+    revealData = await getRevealData(round.id)
+  }
+
+  // Scores
+  const scores = ['question_result', 'finished', 'category'].includes(game.status)
     ? await getPlayerScores(gameId)
     : []
+
+  // My rank
+  const sortedScores = [...scores].sort((a, b) => b.total - a.total)
+  const myRank = sortedScores.findIndex((s) => s.player_id === playerId) + 1
+  const myScore = scores.find((s) => s.player_id === playerId)?.total ?? 0
+
+  const events = await getGameEvents(gameId, 20)
 
   return NextResponse.json({
     game,
     players: safePlayers,
     myPlayer,
-    myRole,
-    myAssignment,
     currentRound: round,
+    currentQuestion,
     submitted,
+    selectedOption,
     submissionStatus,
     revealData,
-    events,
     scores,
+    myRank,
+    myScore,
+    events,
     isGameMaster,
   })
 }

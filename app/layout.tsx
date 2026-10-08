@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: 'THE 14',
-  description: 'Fourteen people. One game.',
+  description: 'Kwani me hudoo!!',
 }
 
 export const viewport: Viewport = {

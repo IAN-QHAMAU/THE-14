@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { createServerSupabase } from '@/lib/db/supabase'
-import { hasPlayerSubmitted, getCurrentRound } from '@/lib/db/queries'
-import { logEvent } from '@/lib/game/stateMachine'
+import { hasPlayerAnswered, getCurrentRound } from '@/lib/db/queries'
 
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -10,46 +9,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 })
   }
 
-  const { actionType, payload } = await req.json()
+  const { optionIndex, timeTakenMs } = await req.json()
   const { playerId, gameId } = session
   const db = createServerSupabase()
 
+  // Validate
+  if (optionIndex === undefined || optionIndex < 0 || optionIndex > 3) {
+    return NextResponse.json({ error: 'Invalid answer.' }, { status: 400 })
+  }
+
   const round = await getCurrentRound(gameId)
   if (!round || round.status !== 'active') {
-    return NextResponse.json({ error: 'No active round.' }, { status: 400 })
+    return NextResponse.json({ error: 'No active question.' }, { status: 400 })
   }
 
-  const alreadySubmitted = await hasPlayerSubmitted(round.id, playerId)
-  if (alreadySubmitted) {
-    return NextResponse.json({ error: 'Already submitted.' }, { status: 400 })
+  const alreadyAnswered = await hasPlayerAnswered(round.id, playerId)
+  if (alreadyAnswered) {
+    return NextResponse.json({ error: 'Already answered.' }, { status: 400 })
   }
 
-  // Validate payload
-  if (!actionType || !payload) {
-    return NextResponse.json({ error: 'Invalid action.' }, { status: 400 })
-  }
-
-  // For split actions, validate the numbers add up
-  if (actionType === 'choice' && payload.teamA !== undefined) {
-    const a = Number(payload.teamA)
-    const b = Number(payload.teamB)
-    if (isNaN(a) || isNaN(b) || a + b !== 1000 || a < 0 || b < 0) {
-      return NextResponse.json({ error: 'Split must total 1000.' }, { status: 400 })
-    }
-  }
-
+  const now = new Date().toISOString()
   const { error } = await db.from('actions').insert({
     round_id: round.id,
     player_id: playerId,
-    action_type: actionType,
-    payload,
+    action_type: 'answer',
+    payload: {
+      option_index: Number(optionIndex),
+      answered_at: now,
+      time_taken_ms: Math.max(0, Number(timeTakenMs) || 0),
+    },
   })
 
   if (error) {
-    return NextResponse.json({ error: 'Could not submit action.' }, { status: 500 })
+    return NextResponse.json({ error: 'Could not submit answer.' }, { status: 500 })
   }
-
-  await logEvent(gameId, round.id, 'vote_cast', playerId, null, { action_type: actionType })
 
   return NextResponse.json({ success: true })
 }

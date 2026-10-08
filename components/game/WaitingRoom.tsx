@@ -1,5 +1,6 @@
 'use client'
 import type { Player, Game } from '@/types'
+import { AvatarDisplay } from '@/components/ui/Avatar'
 
 interface Props {
   game: Game
@@ -23,9 +24,7 @@ export function WaitingRoom({ game, players, myPlayer }: Props) {
         <div>
           <div className="flex items-baseline justify-between mb-4">
             <span className="text-xs text-stone-400 tracking-widest uppercase">Players joined</span>
-            <span className="text-sm font-mono text-stone-600">
-              {count} / {max}
-            </span>
+            <span className="text-sm font-mono text-stone-600">{count} / {max}</span>
           </div>
 
           <div className="space-y-px">
@@ -38,23 +37,24 @@ export function WaitingRoom({ game, players, myPlayer }: Props) {
                     : 'border-stone-200 bg-white'
                 }`}
               >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                    p.is_connected ? 'bg-stone-900' : 'bg-stone-300'
-                  }`}
-                />
+                <AvatarDisplay avatarId={p.avatar} size="sm" />
                 <span className="text-sm text-stone-800">
                   {p.name}
                   {p.id === myPlayer?.id && (
                     <span className="ml-2 text-xs text-stone-400">(you)</span>
                   )}
                 </span>
+                <span
+                  className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    p.is_connected ? 'bg-stone-900' : 'bg-stone-300'
+                  }`}
+                />
               </div>
             ))}
 
             {Array.from({ length: Math.max(0, max - count) }).map((_, i) => (
-              <div key={`empty-${i}`} className="flex items-center gap-3 py-3 px-4 border-l-2 border-stone-100 bg-white">
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-100 flex-shrink-0" />
+              <div key={`e-${i}`} className="flex items-center gap-3 py-3 px-4 border-l-2 border-stone-100 bg-white">
+                <span className="text-stone-200 text-lg">·</span>
                 <span className="text-sm text-stone-300">—</span>
               </div>
             ))}
@@ -62,9 +62,11 @@ export function WaitingRoom({ game, players, myPlayer }: Props) {
         </div>
 
         <p className="text-sm text-stone-400">
-          {count < max
-            ? `Waiting for ${max - count} more player${max - count !== 1 ? 's' : ''} to join.`
-            : 'All players have joined. Waiting for the game to begin.'}
+          {count < 2
+            ? 'Waiting for players to join.'
+            : count < max
+            ? `${max - count} more spot${max - count !== 1 ? 's' : ''} available.`
+            : 'All players have joined.'}
         </p>
 
         <div className="border-t border-stone-100 pt-6">

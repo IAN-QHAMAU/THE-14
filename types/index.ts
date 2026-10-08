@@ -1,6 +1,8 @@
-export type GameStatus = 'waiting' | 'briefing' | 'active' | 'revealing' | 'finished'
-export type RoundStatus = 'pending' | 'briefing' | 'active' | 'locked' | 'revealing' | 'complete'
-export type ActionType = 'vote' | 'choice' | 'accuse' | 'protect' | 'trade' | 'challenge' | 'secret_action'
+import type { Category } from '@/lib/game/questions'
+
+export type GameStatus = 'waiting' | 'category' | 'active' | 'question_result' | 'finished'
+export type RoundStatus = 'pending' | 'active' | 'locked' | 'revealing' | 'complete'
+export type ActionType = 'answer'
 
 export interface Game {
   id: string
@@ -8,6 +10,8 @@ export interface Game {
   status: GameStatus
   current_round: number
   max_players: number
+  category: Category | null
+  total_questions: number
   created_at: string
   started_at: string | null
   ended_at: string | null
@@ -17,7 +21,7 @@ export interface Player {
   id: string
   game_id: string
   name: string
-  avatar: string | null
+  avatar: string
   is_game_master: boolean
   is_connected: boolean
   joined_at: string
@@ -32,31 +36,10 @@ export interface Round {
   round_number: number
   title: string
   description: string
+  question_id: string
   status: RoundStatus
   starts_at: string | null
   ends_at: string | null
-  created_at: string
-}
-
-export interface PlayerRole {
-  id: string
-  game_id: string
-  player_id: string
-  role_name: string
-  secret_objective: string
-  private_information: string
-  special_ability: string | null
-  created_at: string
-}
-
-export interface RoundAssignment {
-  id: string
-  round_id: string
-  player_id: string
-  assignment: string
-  private_instruction: string
-  target_player_id: string | null
-  team: string | null
   created_at: string
 }
 
@@ -65,16 +48,11 @@ export interface Action {
   round_id: string
   player_id: string
   action_type: ActionType
-  payload: Record<string, unknown>
-  created_at: string
-}
-
-export interface Vote {
-  id: string
-  round_id: string
-  voter_id: string
-  target_id: string
-  choice: string
+  payload: {
+    option_index: number
+    answered_at: string
+    time_taken_ms: number
+  }
   created_at: string
 }
 
@@ -99,11 +77,21 @@ export interface Score {
   created_at: string
 }
 
-export interface GameState {
-  game: Game
-  players: Player[]
-  currentRound: Round | null
-  myPlayer: Player | null
-  myRole: PlayerRole | null
-  myAssignment: RoundAssignment | null
+export interface AnswerStat {
+  optionIndex: number
+  count: number
+  percentage: number
+}
+
+export interface RevealData {
+  correctIndex: number
+  answerStats: AnswerStat[]
+  questionId: string
+}
+
+export interface PlayerScoreEntry {
+  player_id: string
+  name: string
+  avatar: string
+  total: number
 }
