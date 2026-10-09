@@ -67,14 +67,21 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Categories
 
+The14 features 11 quiz categories
+
 | Category | Questions |
-|---|---|
+|---|---:|
 | 🧠 General Knowledge | 20 |
 | ⚽ Sports | 15 |
 | 🚗 Cars | 15 |
 | ⛩️ Anime | 20 |
 | 🎵 Music | 15 |
 | ⚡ Wild Facts | 12 |
+| 🇰🇪 Kenya & East Africa | 8 |
+| 🍕 Food & Drinks | 8 |
+| 🎬 Movies & TV | 8 |
+| 🎮 Gaming | 8 |
+| 📱 Internet Culture | 8 |
 
 GM can set between 5 and the category maximum per session.
 
