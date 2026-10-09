@@ -1,5 +1,4 @@
-export type Category = 'general' | 'sports' | 'cars' | 'anime' | 'music' | 'facts'
-
+export type Category = 'general' | 'sports' | 'cars' | 'anime' | 'music' | 'facts' | 'kenya' | 'food' | 'movies' | 'gaming' | 'internet'
 export interface Question {
   id: string
   category: Category
@@ -9,7 +8,6 @@ export interface Question {
   points: number
   speedBonus: number
 }
-
 export const CATEGORIES: Record<Category, { label: string; emoji: string; color: string; questionCount: number }> = {
   general:  { label: 'General Knowledge', emoji: '🧠', color: 'bg-stone-800',   questionCount: 20 },
   sports:   { label: 'Sports',            emoji: '⚽', color: 'bg-emerald-800', questionCount: 15 },
@@ -17,8 +15,12 @@ export const CATEGORIES: Record<Category, { label: string; emoji: string; color:
   anime:    { label: 'Anime',             emoji: '⛩️', color: 'bg-purple-800',  questionCount: 20 },
   music:    { label: 'Music',             emoji: '🎵', color: 'bg-blue-800',    questionCount: 15 },
   facts:    { label: 'Wild Facts',        emoji: '⚡', color: 'bg-amber-800',   questionCount: 12 },
+  kenya:    { label: 'Kenya & East Africa', emoji: '🇰🇪', color: 'bg-green-800', questionCount: 8 },
+  food:     { label: 'Food & Drinks',       emoji: '🍕', color: 'bg-orange-800', questionCount: 8 },
+  movies:   { label: 'Movies & TV',         emoji: '🎬', color: 'bg-indigo-800', questionCount: 8 },
+  gaming:   { label: 'Gaming',              emoji: '🎮', color: 'bg-violet-800', questionCount: 8 },
+  internet: { label: 'Internet Culture',    emoji: '📱', color: 'bg-pink-800', questionCount: 8 },
 }
-
 export const QUESTIONS: Record<Category, Question[]> = {
   general: [
     { id: 'g1',  category: 'general', question: 'What is the capital of Japan?',                                         options: ['Beijing','Seoul','Tokyo','Bangkok'],                                    correct: 2, points: 100, speedBonus: 50 },
@@ -42,7 +44,6 @@ export const QUESTIONS: Record<Category, Question[]> = {
     { id: 'g19', category: 'general', question: 'Which gas do plants absorb from the atmosphere?',                       options: ['Oxygen','Nitrogen','CO2','Hydrogen'],                                   correct: 2, points: 100, speedBonus: 50 },
     { id: 'g20', category: 'general', question: 'Who wrote Romeo and Juliet?',                                           options: ['Dickens','Chaucer','Shakespeare','Marlowe'],                            correct: 2, points: 100, speedBonus: 50 },
   ],
-
   sports: [
     { id: 's1',  category: 'sports', question: 'How many players are on a football (soccer) team?',                      options: ['9','10','11','12'],                                                     correct: 2, points: 100, speedBonus: 50 },
     { id: 's2',  category: 'sports', question: 'Which country has won the most FIFA World Cups?',                        options: ['Germany','Argentina','Brazil','Italy'],                                 correct: 2, points: 150, speedBonus: 75 },
@@ -60,7 +61,6 @@ export const QUESTIONS: Record<Category, Question[]> = {
     { id: 's14', category: 'sports', question: 'What colour is the away jersey of Brazil\'s football team?',             options: ['White','Yellow','Blue','Green'],                                        correct: 2, points: 200, speedBonus: 100 },
     { id: 's15', category: 'sports', question: 'In F1, what does DRS stand for?',                                        options: ['Direct Race Speed','Drag Reduction System','Drive Ratio Switch','Dual Rear Spoiler'], correct: 1, points: 200, speedBonus: 100 },
   ],
-
   cars: [
     { id: 'c1',  category: 'cars', question: 'Which country is Ferrari from?',                                           options: ['Germany','France','UK','Italy'],                                        correct: 3, points: 100, speedBonus: 50 },
     { id: 'c2',  category: 'cars', question: 'What does BMW stand for (in German)?',                                     options: ['Bavarian Motor Works','Berlin Motor Works','Bavarian Machine Works','British Motor Works'], correct: 0, points: 150, speedBonus: 75 },
@@ -78,7 +78,6 @@ export const QUESTIONS: Record<Category, Question[]> = {
     { id: 'c14', category: 'cars', question: 'What year was the first Ford Mustang released?',                           options: ['1960','1962','1964','1966'],                                            correct: 2, points: 200, speedBonus: 100 },
     { id: 'c15', category: 'cars', question: 'Which supercar brand uses a bull as its logo?',                            options: ['Ferrari','Alfa Romeo','Lamborghini','Maserati'],                       correct: 2, points: 100, speedBonus: 50 },
   ],
-
   anime: [
     { id: 'a1',  category: 'anime', question: 'What is the name of the main character in Naruto?',                       options: ['Sasuke','Sakura','Naruto','Kakashi'],                                   correct: 2, points: 100, speedBonus: 50 },
     { id: 'a2',  category: 'anime', question: 'In Dragon Ball Z, what is Goku\'s home planet called?',                   options: ['Namek','Earth','Vegeta','Planet Saiyan'],                               correct: 2, points: 150, speedBonus: 75 },
@@ -101,7 +100,6 @@ export const QUESTIONS: Record<Category, Question[]> = {
     { id: 'a19', category: 'anime', question: 'In Dragon Ball, what level is Super Saiyan Blue?',                        options: ['Super Saiyan 4','Super Saiyan God Super Saiyan','Super Saiyan 5','Ultra Instinct'], correct: 1, points: 200, speedBonus: 100 },
     { id: 'a20', category: 'anime', question: 'Who trained Naruto to use Sage Mode?',                                    options: ['Jiraiya','Fukasaku','Kakashi','Minato'],                                correct: 1, points: 200, speedBonus: 100 },
   ],
-
   music: [
     { id: 'm1',  category: 'music', question: 'Which artist released the album "Thriller"?',                             options: ['Prince','Whitney Houston','Michael Jackson','Stevie Wonder'],          correct: 2, points: 100, speedBonus: 50 },
     { id: 'm2',  category: 'music', question: 'How many strings does a standard guitar have?',                           options: ['4','5','6','7'],                                                        correct: 2, points: 100, speedBonus: 50 },
@@ -119,7 +117,6 @@ export const QUESTIONS: Record<Category, Question[]> = {
     { id: 'm14', category: 'music', question: 'What is the name of Beyoncé\'s alter ego?',                               options: ['Sasha Fierce','Lemonade','Destiny','B\'Day'],                          correct: 0, points: 150, speedBonus: 75 },
     { id: 'm15', category: 'music', question: 'Which Nigerian artist is known as "Afrobeats"?',                          options: ['Wizkid','Burna Boy','Davido','All of the above'],                       correct: 3, points: 150, speedBonus: 75 },
   ],
-
   facts: [
     { id: 'f1',  category: 'facts', question: 'A group of flamingos is called a…',                                       options: ['Flock','Flamboyance','Flutter','Flame'],                                correct: 1, points: 150, speedBonus: 75 },
     { id: 'f2',  category: 'facts', question: 'How long is a day on Venus (in Earth days)?',                             options: ['117','243','365','500'],                                                correct: 1, points: 250, speedBonus: 125 },
@@ -134,6 +131,63 @@ export const QUESTIONS: Record<Category, Question[]> = {
     { id: 'f11', category: 'facts', question: 'How many teeth does an adult human have?',                                options: ['28','30','32','34'],                                                    correct: 2, points: 150, speedBonus: 75 },
     { id: 'f12', category: 'facts', question: 'What colour is the blood of an octopus?',                                 options: ['Red','Green','Blue','Purple'],                                          correct: 2, points: 200, speedBonus: 100 },
   ],
+
+  kenya: [
+    { id: 'ke1', category: 'kenya', question: 'Which city is known as the Green City in the Sun?', options: ['Mombasa', 'Nairobi', 'Kisumu', 'Nakuru'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'ke2', category: 'kenya', question: 'What is the currency of Kenya?', options: ['Tanzanian shilling', 'Ugandan shilling', 'Kenyan shilling', 'Rwandan franc'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'ke3', category: 'kenya', question: 'Which Kenyan reserve is famous for the wildebeest migration?', options: ['Amboseli', 'Tsavo East', 'Maasai Mara', 'Lake Nakuru'], correct: 2, points: 150, speedBonus: 75 },
+    { id: 'ke4', category: 'kenya', question: 'What is the highest mountain in Kenya?', options: ['Mount Elgon', 'Mount Kenya', 'Longonot', 'Aberdare'], correct: 1, points: 150, speedBonus: 75 },
+    { id: 'ke5', category: 'kenya', question: 'Which ocean borders Kenya to the southeast?', options: ['Atlantic Ocean', 'Pacific Ocean', 'Indian Ocean', 'Arctic Ocean'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'ke6', category: 'kenya', question: 'Which Kenyan athlete is famous for breaking the two-hour marathon barrier in an unofficial event?', options: ['David Rudisha', 'Eliud Kipchoge', 'Faith Kipyegon', 'Brigid Kosgei'], correct: 1, points: 200, speedBonus: 100 },
+    { id: 'ke7', category: 'kenya', question: 'What are Kenya’s two official languages?', options: ['English and Kikuyu', 'Swahili and English', 'Swahili and French', 'English and Arabic'], correct: 1, points: 150, speedBonus: 75 },
+    { id: 'ke8', category: 'kenya', question: 'Which lake is the largest lake in Africa by surface area?', options: ['Lake Naivasha', 'Lake Tanganyika', 'Lake Victoria', 'Lake Turkana'], correct: 2, points: 150, speedBonus: 75 },
+  ],
+
+  food: [
+    { id: 'fd1', category: 'food', question: 'Which country is widely associated with the origin of sushi?', options: ['China', 'Japan', 'Thailand', 'South Korea'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'fd2', category: 'food', question: 'What is the main ingredient in guacamole?', options: ['Cucumber', 'Green peas', 'Avocado', 'Spinach'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'fd3', category: 'food', question: 'Which spice gives many curries their yellow colour?', options: ['Cinnamon', 'Turmeric', 'Paprika', 'Nutmeg'], correct: 1, points: 150, speedBonus: 75 },
+    { id: 'fd4', category: 'food', question: 'What is tofu traditionally made from?', options: ['Rice', 'Milk', 'Soybeans', 'Chickpeas'], correct: 2, points: 150, speedBonus: 75 },
+    { id: 'fd5', category: 'food', question: 'Which fruit is dried to make prunes?', options: ['Apricots', 'Plums', 'Dates', 'Grapes'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'fd6', category: 'food', question: 'What is the main ingredient in traditional hummus?', options: ['Lentils', 'Chickpeas', 'Potatoes', 'Cashews'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'fd7', category: 'food', question: 'Which drink is traditionally made by fermenting tea with a culture of bacteria and yeast?', options: ['Kefir', 'Kombucha', 'Chai latte', 'Malt'], correct: 1, points: 200, speedBonus: 100 },
+    { id: 'fd8', category: 'food', question: 'Which of these is a type of pasta?', options: ['Bulgur', 'Couscous', 'Penne', 'Polenta'], correct: 2, points: 100, speedBonus: 50 },
+  ],
+
+  movies: [
+    { id: 'mv1', category: 'movies', question: 'What is the name of Harry Potter’s school?', options: ['Beauxbatons', 'Hogwarts', 'Durmstrang', 'Ilvermorny'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'mv2', category: 'movies', question: 'Who played Jack in the 1997 film Titanic?', options: ['Brad Pitt', 'Leonardo DiCaprio', 'Matt Damon', 'Tom Cruise'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'mv3', category: 'movies', question: 'In The Lion King, what is Simba’s father called?', options: ['Scar', 'Rafiki', 'Mufasa', 'Zazu'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'mv4', category: 'movies', question: 'Which film features the line “May the Force be with you”?', options: ['Star Trek', 'Star Wars', 'Dune', 'Avatar'], correct: 1, points: 150, speedBonus: 75 },
+    { id: 'mv5', category: 'movies', question: 'What is the name of the fictional African nation in Black Panther?', options: ['Genovia', 'Zamunda', 'Wakanda', 'Sokovia'], correct: 2, points: 150, speedBonus: 75 },
+    { id: 'mv6', category: 'movies', question: 'Which actor plays Iron Man in the Marvel Cinematic Universe?', options: ['Chris Evans', 'Chris Hemsworth', 'Robert Downey Jr.', 'Mark Ruffalo'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'mv7', category: 'movies', question: 'What is the name of the coffee shop in Friends?', options: ['Central Perk', 'Coffee Bean', 'Monk’s Café', 'Java House'], correct: 0, points: 150, speedBonus: 75 },
+    { id: 'mv8', category: 'movies', question: 'Which animated film features a snowman named Olaf?', options: ['Moana', 'Frozen', 'Tangled', 'Encanto'], correct: 1, points: 100, speedBonus: 50 },
+  ],
+
+  gaming: [
+    { id: 'gm1', category: 'gaming', question: 'Which company makes the PlayStation console?', options: ['Microsoft', 'Nintendo', 'Sony', 'Sega'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'gm2', category: 'gaming', question: 'Which game features the battle royale island called Erangel?', options: ['Fortnite', 'PUBG', 'Apex Legends', 'Minecraft'], correct: 1, points: 150, speedBonus: 75 },
+    { id: 'gm3', category: 'gaming', question: 'What is the name of Mario’s brother?', options: ['Wario', 'Toad', 'Luigi', 'Yoshi'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'gm4', category: 'gaming', question: 'In Minecraft, which material is needed to build a Nether portal frame?', options: ['Diamond', 'Obsidian', 'Iron', 'Bedrock'], correct: 1, points: 150, speedBonus: 75 },
+    { id: 'gm5', category: 'gaming', question: 'Which game series features Master Chief?', options: ['Halo', 'Gears of War', 'Call of Duty', 'Destiny'], correct: 0, points: 150, speedBonus: 75 },
+    { id: 'gm6', category: 'gaming', question: 'What is the name of the island in Animal Crossing: New Horizons where players build their community?', options: ['Koholint', 'The player’s island', 'Wuhu Island', 'Isle Delfino'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'gm7', category: 'gaming', question: 'Which company created the Pokémon franchise alongside Nintendo and Game Freak?', options: ['Creatures', 'Capcom', 'Bandai Namco', 'Square Enix'], correct: 0, points: 200, speedBonus: 100 },
+    { id: 'gm8', category: 'gaming', question: 'In chess, which piece moves in an L shape?', options: ['Bishop', 'Rook', 'Knight', 'Queen'], correct: 2, points: 100, speedBonus: 50 },
+  ],
+
+  internet: [
+    { id: 'in1', category: 'internet', question: 'What does “DM” usually stand for on social media?', options: ['Daily Mention', 'Direct Message', 'Digital Media', 'Double Mode'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'in2', category: 'internet', question: 'What does “POV” commonly stand for in a video caption?', options: ['Post Of the Video', 'Point of View', 'Proof of Value', 'Picture on View'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'in3', category: 'internet', question: 'Which platform is known for short looping videos and the “For You” feed?', options: ['LinkedIn', 'TikTok', 'Pinterest', 'Reddit'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'in4', category: 'internet', question: 'What does “viral” mean when describing online content?', options: ['It contains a virus', 'It spreads quickly and widely', 'It is always paid content', 'It can only be watched once'], correct: 1, points: 150, speedBonus: 75 },
+    { id: 'in5', category: 'internet', question: 'What is a hashtag symbol commonly called?', options: ['Ampersand', 'Asterisk', 'Pound sign', 'At sign'], correct: 2, points: 100, speedBonus: 50 },
+    { id: 'in6', category: 'internet', question: 'What does “FOMO” stand for?', options: ['Fear of Missing Out', 'Focus on More Options', 'Friends Online, Meet Often', 'First One Makes Offers'], correct: 0, points: 150, speedBonus: 75 },
+    { id: 'in7', category: 'internet', question: 'What is a meme usually created to do?', options: ['Replace a website', 'Share a relatable idea or joke', 'Secure a password', 'Compress a video'], correct: 1, points: 100, speedBonus: 50 },
+    { id: 'in8', category: 'internet', question: 'What does “OOTD” mean in fashion posts?', options: ['Outfit of the Day', 'Online Order Tracking Details', 'Only One Trend Daily', 'Outdoors on Thursday'], correct: 0, points: 150, speedBonus: 75 },
+  ],
+
+
 }
 
 export function getQuestionsForCategory(category: Category, count?: number): Question[] {
