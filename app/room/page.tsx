@@ -151,17 +151,22 @@ export default function RoomPage() {
   // Category reveal / between questions
   return (
     <main className="min-h-screen bg-stone-50 flex items-center justify-center px-6">
-      {game.category ? (
-        <CategoryReveal
-          category={game.category}
-          totalQuestions={game.total_questions}
-        />
-      ) : (
-        <div className="text-center space-y-2">
-          <p className="text-sm text-stone-500">Waiting for the game to begin…</p>
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-stone-400 animate-pulse" />
-        </div>
-      )}
+      
+  {game.category ? (
+    <CategoryReveal
+      category={game.category}
+      totalQuestions={game.total_questions}
+      currentQuestion={game.current_round}
+      scores={scores}
+    />
+  ) : (
+    <div className="text-center space-y-2">
+      <p className="text-sm text-stone-500">
+        Waiting for the game to begin.
+      </p>
+    </div>
+  )}
+
     </main>
   )
 }
