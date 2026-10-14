@@ -12,15 +12,15 @@ export type QuestionType =
 
 export type Category =
   // Brain
-  | 'general' | 'science' | 'history' | 'geography' | 'space' | 'logic' | 'facts'
+  | 'general' | 'science' | 'history' | 'geography' | 'space' | 'logic' | 'facts' | 'tech' | 'words' | 'mythology' | 'body'
   // Pop culture
-  | 'anime' | 'movies' | 'music' | 'gaming' | 'internet' | 'heroes' | 'cartoons'
+  | 'anime' | 'movies' | 'music' | 'gaming' | 'internet' | 'heroes' | 'cartoons' | 'books' | 'afromusic'
   // Sports
   | 'sports' | 'football' | 'basketball' | 'motorsport' | 'olympics' | 'racket'
   // Kenya & Africa
   | 'kenya' | 'africa'
   // Lifestyle
-  | 'food' | 'cars' | 'animals' | 'brands'
+  | 'food' | 'cars' | 'animals' | 'brands' | 'money' | 'fashion'
   // Party modes (not picked as a category, used by social game types)
   | 'party'
 
@@ -126,6 +126,10 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   space:      { label: 'Space',              emoji: '🪐', group: 'brain' },
   logic:      { label: 'Riddles & Numbers',  emoji: '🧩', group: 'brain' },
   facts:      { label: 'Wild Facts',         emoji: '⚡', group: 'brain' },
+  tech:       { label: 'Tech',               emoji: '💻', group: 'brain' },
+  words:      { label: 'Words & Language',   emoji: '🔤', group: 'brain' },
+  mythology:  { label: 'Mythology',          emoji: '⚱️', group: 'brain' },
+  body:       { label: 'Human Body',         emoji: '🫀', group: 'brain' },
 
   anime:      { label: 'Anime',              emoji: '⛩️', group: 'pop' },
   movies:     { label: 'Movies & TV',        emoji: '🎬', group: 'pop' },
@@ -134,6 +138,8 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   internet:   { label: 'Internet Culture',   emoji: '📱', group: 'pop' },
   heroes:     { label: 'Superheroes',        emoji: '🦸', group: 'pop' },
   cartoons:   { label: 'Cartoons',           emoji: '📺', group: 'pop' },
+  books:      { label: 'Books & Literature', emoji: '📚', group: 'pop' },
+  afromusic:  { label: 'African Music',      emoji: '🥁', group: 'pop' },
 
   sports:     { label: 'Sports Mix',         emoji: '🏅', group: 'sports' },
   football:   { label: 'Football',           emoji: '⚽', group: 'sports' },
@@ -149,6 +155,8 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   cars:       { label: 'Cars',               emoji: '🚗', group: 'lifestyle' },
   animals:    { label: 'Animals',            emoji: '🐘', group: 'lifestyle' },
   brands:     { label: 'Brands & Logos',     emoji: '🏷️', group: 'lifestyle' },
+  money:      { label: 'Money & Business',   emoji: '💰', group: 'lifestyle' },
+  fashion:    { label: 'Fashion',            emoji: '👗', group: 'lifestyle' },
 
   party:      { label: 'Party',              emoji: '🎉', group: null },
 }

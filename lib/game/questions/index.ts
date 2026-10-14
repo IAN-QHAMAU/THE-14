@@ -1,5 +1,6 @@
 import { CLASSIC_QUESTIONS } from './classic'
 import { MORE_QUESTIONS } from './more'
+import { EXTRA_QUESTIONS, EXTRA_TRUE_FALSE, EXTRA_CLOSEST, EXTRA_ORDER } from './extra'
 import { TRUE_FALSE, EMOJI, PICTURE, CLOSEST, ORDER, MOST_LIKELY, BLUFF } from './special'
 import {
   CATEGORIES,
@@ -22,6 +23,10 @@ function normalize(q: RawChoiceQuestion): Question {
 export const ALL_QUESTIONS: Question[] = [
   ...Object.values(CLASSIC_QUESTIONS).flat().map(normalize),
   ...MORE_QUESTIONS.map(normalize),
+  ...EXTRA_QUESTIONS.map(normalize),
+  ...EXTRA_TRUE_FALSE,
+  ...EXTRA_CLOSEST,
+  ...EXTRA_ORDER,
   ...TRUE_FALSE,
   ...EMOJI,
   ...PICTURE,
