@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useGameState } from '@/lib/hooks/useGameState'
 import { WaitingRoom } from '@/components/game/WaitingRoom'
@@ -7,10 +7,10 @@ import { GameIntro } from '@/components/game/GameIntro'
 import { QuestionScreen, type SubmitBody } from '@/components/game/QuestionScreen'
 import { QuestionResult } from '@/components/game/QuestionResult'
 import { Standings } from '@/components/game/Standings'
-import { Podium, shareResult } from '@/components/game/Podium'
+import { Podium } from '@/components/game/Podium'
+import { ShareCard } from '@/components/game/ShareCard'
 import { ReactionBar, ReactionLayer, useReactions } from '@/components/game/Reactions'
 import { SoundToggle } from '@/components/ui/SoundToggle'
-import { Button } from '@/components/ui/Button'
 
 function Dark({ children }: { children: React.ReactNode }) {
   return (
@@ -27,7 +27,6 @@ export default function RoomPage() {
   const router = useRouter()
   const toJoin = useCallback(() => router.push('/join'), [router])
   const { state, error, refresh } = useGameState({ onUnauthorized: toJoin })
-  const [shareNote, setShareNote] = useState('')
 
   const me = useMemo(
     () => (state?.myPlayer ? { id: state.myPlayer.id, name: state.myPlayer.name } : undefined),
@@ -80,24 +79,22 @@ export default function RoomPage() {
   }
 
   if (game.status === 'finished') {
-    const summary = `THE 14: I finished ${state.myRank} of ${state.scores.length} with ${state.myScore} points.`
+    const meEntry = state.scores.find((s) => s.player_id === myPlayer?.id)
     return (
       <Dark>
         <ReactionLayer items={items} />
         <Podium scores={state.scores} awards={state.awards} myPlayerId={myPlayer?.id}>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <ReactionBar onSend={send} dark />
-            <Button
-              variant="secondary"
-              className="w-full bg-transparent border-stone-700 text-stone-300 hover:bg-stone-800"
-              onClick={async () => {
-                const r = await shareResult(summary)
-                setShareNote(r === 'copied' ? 'Copied.' : r === 'failed' ? 'Could not share.' : '')
-              }}
-            >
-              Share result
-            </Button>
-            {shareNote && <p className="text-xs text-center text-stone-500">{shareNote}</p>}
+            {meEntry && (
+              <ShareCard
+                me={meEntry}
+                rank={state.myRank}
+                totalPlayers={state.scores.length}
+                scores={state.scores}
+                awards={state.awards}
+              />
+            )}
           </div>
         </Podium>
       </Dark>

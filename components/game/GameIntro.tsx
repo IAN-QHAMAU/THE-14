@@ -14,7 +14,7 @@ export function GameIntro({ game, size = 'phone' }: { game: Game; size?: 'phone'
   return (
     <div className={cn('w-full mx-auto text-center flex flex-col items-center gap-8', stage ? 'max-w-3xl' : 'max-w-sm')}>
       <div className="space-y-2 animate-fade-up">
-        <p className="text-xs tracking-widest uppercase text-stone-500">Tonight&apos;s game</p>
+        <p className="text-xs tracking-widest uppercase text-stone-500">The lineup</p>
         <h1 className={cn('font-light text-stone-50', stage ? 'text-6xl' : 'text-4xl')}>
           {cats.length === 1 ? `${CATEGORIES[cats[0]].emoji} ${CATEGORIES[cats[0]].label}` : allCats ? 'Everything' : 'The Mix'}
         </h1>
