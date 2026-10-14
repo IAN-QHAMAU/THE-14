@@ -1,197 +1,99 @@
-
 'use client'
 
-import { useEffect, useState } from 'react'
-import type { Question } from '@/lib/game/questions'
-
-interface AnswerStat {
-  optionIndex: number
-  count: number
-  percentage: number
-}
+import { useEffect, useRef } from 'react'
+import { AvatarDisplay } from '@/components/ui/Avatar'
+import { RevealBoard } from '@/components/game/RevealBoard'
+import { ReactionBar } from '@/components/game/Reactions'
+import { resultLine } from '@/lib/game/lines'
+import { sound } from '@/lib/sound'
+import { cn } from '@/lib/utils'
+import type { GameStateResponse } from '@/types'
 
 interface Props {
-  question: Question
-  selectedOption: number | null
-  pointsEarned: number
-  answerStats: AnswerStat[]
-  myRank: number
-  totalPlayers: number
-  myScore: number
-  timeTakenMs?: number | null
+  state: GameStateResponse
+  onReact: (emoji: string) => void
 }
 
-function getResultReaction(
-  selectedOption: number | null,
-  correctOption: number,
-  timeTakenMs?: number | null,
-): string {
-  if (selectedOption === null) return 'Missed.'
-  if (selectedOption !== correctOption) return 'Wrong.'
-  if (timeTakenMs == null) return 'Correct.'
-  if (timeTakenMs < 3000) return 'First.'
-  if (timeTakenMs < 7000) return 'Fast.'
-  return 'Correct.'
-}
+export function QuestionResult({ state, onReact }: Props) {
+  const { reveal, currentQuestion: q, myPlayer, currentRound: round, game } = state
+  const me = myPlayer?.id ?? ''
+  const r = reveal?.results[me]
+  const played = useRef<string | null>(null)
 
-export function QuestionResult({
-  question,
-  selectedOption,
-  pointsEarned,
-  answerStats,
-  myRank,
-  totalPlayers,
-  myScore,
-  timeTakenMs,
-}: Props) {
-  const [step, setStep] = useState(0)
-  const isCorrect = selectedOption === question.correct
-  const optionLabels = ['A', 'B', 'C', 'D']
-
-  const reaction = getResultReaction(
-    selectedOption,
-    question.correct,
-    timeTakenMs,
-  )
+  const timerMs = (game.settings?.timer ?? 20) * 1000
+  const names = (ids?: string[]) => (ids ?? []).map((id) => state.players.find((p) => p.id === id)?.name ?? 'someone')
+  const line = reveal && q ? resultLine(reveal.type, r, `${me}:${q.id}`, { timerMs, fellForNames: names(r?.fellFor) }) : null
 
   useEffect(() => {
-    setStep(0)
+    if (!line || !round || played.current === round.id) return
+    played.current = round.id
+    if (line.tone === 'good') sound.correct()
+    else if (line.tone === 'bad') sound.wrong()
+    else sound.reveal()
+  }, [line, round])
 
-    const timers = [
-      setTimeout(() => setStep(1), 400),
-      setTimeout(() => setStep(2), 900),
-      setTimeout(() => setStep(3), 1900),
-    ]
+  if (!reveal || !q || !line) return null
 
-    return () => timers.forEach(clearTimeout)
-  }, [question.id])
+  const before = reveal.rank_before[me]
+  const after = reveal.rank_after[me] ?? state.myRank
+  const moved = before && after ? before - after : 0
+  const totalPlayers = state.players.filter((p) => !p.is_game_master).length
 
   return (
-    <main className="min-h-screen flex flex-col px-4 py-8 bg-stone-50">
-      <div className="max-w-sm mx-auto w-full space-y-6">
-
-        <div
-          className={`p-5 text-center transition-opacity duration-500 ${
-            step >= 1 ? 'opacity-100' : 'opacity-0'
-          } ${
-            isCorrect
-              ? 'bg-stone-900 text-stone-50'
-              : 'bg-stone-100 text-stone-500'
-          }`}
-        >
-          <p className="text-sm font-medium">{reaction}</p>
-
-          {pointsEarned > 0 && (
-            <p className="text-xs mt-2 opacity-70">
-              +{pointsEarned} points
-            </p>
-          )}
-        </div>
-
-        {step >= 1 && (
-          <section className="space-y-1">
-            <p className="text-xs text-stone-400 uppercase tracking-widest">
-              Correct answer
-            </p>
-
-            <div className="flex items-center gap-3 p-3 bg-stone-900 text-stone-50">
-              <span className="w-6 h-6 flex items-center justify-center text-xs font-bold border border-stone-50">
-                {optionLabels[question.correct]}
-              </span>
-              <span className="text-sm">
-                {question.options[question.correct]}
-              </span>
-            </div>
-          </section>
-        )}
-
+    <main className="min-h-[100dvh] bg-stone-50 flex flex-col px-4 pt-6 pb-8">
+      <div className="max-w-md mx-auto w-full space-y-6">
         <section
-          className={`space-y-3 transition-opacity duration-300 ${
-            step >= 2 ? 'opacity-100' : 'opacity-0'
-          }`}
-          aria-hidden={step < 2}
+          className={cn(
+            'rounded-2xl p-5 flex items-center gap-4 animate-fade-up',
+            line.tone === 'good' ? 'bg-emerald-50 text-emerald-950' : line.tone === 'bad' ? 'bg-rose-50 text-rose-950' : 'bg-stone-100 text-stone-800',
+          )}
         >
-          <p className="text-xs text-stone-400 uppercase tracking-widest">
-            How everyone answered
-          </p>
-
-          {question.options.map((option, index) => {
-            const stat = answerStats.find(
-              (item) => item.optionIndex === index,
-            )
-            const percentage = Math.max(
-              0,
-              Math.min(100, stat?.percentage ?? 0),
-            )
-            const correct = index === question.correct
-
-            return (
-              <div key={index} className="space-y-1">
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <span
-                    className={`min-w-0 ${
-                      correct
-                        ? 'text-stone-900 font-medium'
-                        : 'text-stone-500'
-                    }`}
-                  >
-                    {optionLabels[index]}. {option}
-                  </span>
-
-                  <span className="text-stone-400 font-mono flex-shrink-0">
-                    {Math.round(percentage)}%
-                  </span>
-                </div>
-
-                <div className="h-1.5 bg-stone-100 w-full overflow-hidden">
-                  <div
-                    className={`h-full ${
-                      correct ? 'bg-stone-900' : 'bg-stone-300'
-                    } transition-transform duration-500 ease-out motion-reduce:transition-none`}
-                    style={{
-                      width: `${percentage}%`,
-                      transform:
-                        step >= 2 ? 'translateX(0)' : 'translateX(-100%)',
-                      transitionDelay:
-                        step >= 2 ? `${index * 150}ms` : '0ms',
-                    }}
-                  />
-                </div>
-              </div>
-            )
-          })}
+          {myPlayer && <AvatarDisplay avatarId={myPlayer.avatar} size="lg" mood={line.tone === 'good' ? 'happy' : line.tone === 'bad' ? 'sad' : null} />}
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-medium leading-snug">{line.headline}</p>
+            {line.sub && <p className="text-sm opacity-70 mt-0.5">{line.sub}</p>}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs opacity-80">
+              <span className="font-mono">{r?.points ? `+${r.points}` : '+0'}</span>
+              {r?.streakBonus ? <span>🔥 {r.streak} in a row, +{r.streakBonus}</span> : null}
+              {r?.tooFast && r.correct === false ? <span>Too fast</span> : null}
+              {r?.timeMs != null && reveal.type !== 'mostlikely' && reveal.type !== 'bluff' ? <span>{(r.timeMs / 1000).toFixed(1)}s</span> : null}
+            </div>
+          </div>
         </section>
 
-        {step >= 3 && (
-          <section className="border-t border-stone-200 pt-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-stone-400 uppercase tracking-widest">
-                Your score
-              </p>
-              <p className="text-2xl font-light text-stone-900">
-                {myScore}
-              </p>
-            </div>
+        <section className="animate-fade-up" style={{ animationDelay: '250ms' }}>
+          <p className="text-sm text-stone-500 mb-3">{q.question}</p>
+          <RevealBoard
+            reveal={reveal}
+            question={q}
+            players={state.players}
+            myPlayerId={me}
+            myChoice={state.myAnswer?.option_index ?? null}
+            optionAvatars={round?.data?.players?.map((p) => p.avatar)}
+          />
+        </section>
 
-            <div className="text-right">
-              <p className="text-xs text-stone-400 uppercase tracking-widest">
-                Rank
-              </p>
-              <p className="text-2xl font-light text-stone-900">
-                {myRank}{' '}
-                <span className="text-sm text-stone-400">
-                  / {totalPlayers}
+        <section className="flex items-center justify-between border-t border-stone-200 pt-4 animate-fade-up" style={{ animationDelay: '500ms' }}>
+          <div>
+            <p className="text-xs text-stone-400 uppercase tracking-widest">Score</p>
+            <p className="text-2xl font-light text-stone-900 tabular-nums">{state.myScore}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-stone-400 uppercase tracking-widest">Rank</p>
+            <p className="text-2xl font-light text-stone-900">
+              {after}
+              <span className="text-sm text-stone-400"> / {totalPlayers}</span>
+              {moved !== 0 && (
+                <span className={cn('ml-2 text-sm', moved > 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                  {moved > 0 ? `▲${moved}` : `▼${-moved}`}
                 </span>
-              </p>
-            </div>
-          </section>
-        )}
+              )}
+            </p>
+          </div>
+        </section>
 
-        {step >= 3 && (
-          <p className="text-xs text-stone-400 text-center">
-            Waiting for Game Master.
-          </p>
-        )}
+        <ReactionBar onSend={onReact} />
+        <p className="text-xs text-stone-400 text-center">Waiting for the host.</p>
       </div>
     </main>
   )

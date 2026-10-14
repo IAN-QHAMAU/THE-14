@@ -1,19 +1,30 @@
 import { createServerSupabase } from '@/lib/db/supabase'
-import { QUESTIONS, getQuestionsForCategory, type Category } from '@/lib/game/questions'
-import type { GameStatus, RoundStatus } from '@/types'
+import { getAllReveals, getRoundActions } from '@/lib/db/queries'
+import {
+  GET_READY_MS,
+  answerWindowSeconds,
+  getQuestionById,
+  pickQuestions,
+  shuffle,
+  type GameSettings,
+  type RoundData,
+} from '@/lib/game/questions'
+import { buildBluffOptions, computeAwards, computeRanks, gradeRound } from '@/lib/game/scoring'
+import type { Game, GameStatus, Player, Round, RoundStatus } from '@/types'
 
 const db = () => createServerSupabase()
 
-// ─── Game transitions ──────────────────────────────────────────────────────
+// ─── Setup ─────────────────────────────────────────────────────────────────
 
-export async function setupGame(gameId: string, category: Category, questionCount: number) {
+export async function setupGame(gameId: string, settings: GameSettings) {
   const client = db()
+  const questions = pickQuestions(settings)
+  if (!questions.length) return { error: 'No questions match that setup.' }
 
-  const questions = getQuestionsForCategory(category, questionCount)
-
-  // Store selected questions as rounds
   await client.from('rounds').delete().eq('game_id', gameId)
-  await client.from('rounds').insert(
+  await client.from('scores').delete().eq('game_id', gameId)
+  await client.from('events').delete().eq('game_id', gameId)
+  const { error: insertError } = await client.from('rounds').insert(
     questions.map((q, i) => ({
       game_id: gameId,
       round_number: i + 1,
@@ -21,178 +32,235 @@ export async function setupGame(gameId: string, category: Category, questionCoun
       description: q.question,
       question_id: q.id,
       status: 'pending' as RoundStatus,
-    }))
+      data: {},
+    })),
   )
+  if (insertError) {
+    // Most likely the database is missing the columns added in migration 002.
+    return { error: 'Could not set up questions. Run supabase/migrations/002_game_modes.sql in Supabase.' }
+  }
+
+  await client
+    .from('players')
+    .update({ score: 0, streak: 0, best_streak: 0 })
+    .eq('game_id', gameId)
 
   await client
     .from('games')
     .update({
       status: 'category' as GameStatus,
-      category,
+      category: settings.categories.length === 1 ? settings.categories[0] : 'mix',
+      settings: { ...settings, questionCount: questions.length },
       total_questions: questions.length,
+      current_round: 0,
       started_at: new Date().toISOString(),
+      ended_at: null,
     })
     .eq('id', gameId)
 
-  await logEvent(gameId, null, 'game_started', null, null, { category, questionCount })
+  await logEvent(gameId, null, 'game_started', { questions: questions.length })
+  return { error: null }
 }
 
-export async function startNextQuestion(gameId: string) {
+/** Back to the lobby with the same players, ready for another game. */
+export async function resetGame(gameId: string) {
   const client = db()
+  await client.from('rounds').delete().eq('game_id', gameId)
+  await client.from('scores').delete().eq('game_id', gameId)
+  await client.from('events').delete().eq('game_id', gameId)
+  await client.from('players').update({ score: 0, streak: 0, best_streak: 0 }).eq('game_id', gameId)
+  await client
+    .from('games')
+    .update({ status: 'waiting' as GameStatus, current_round: 1, total_questions: 0, ended_at: null })
+    .eq('id', gameId)
+}
 
-  // Find next pending round
+// ─── Questions ─────────────────────────────────────────────────────────────
+
+async function completeOpenRounds(gameId: string) {
+  await db()
+    .from('rounds')
+    .update({ status: 'complete' as RoundStatus })
+    .eq('game_id', gameId)
+    .in('status', ['revealing', 'locked'])
+}
+
+export async function startNextQuestion(game: Game, players: Player[]) {
+  const client = db()
+  await completeOpenRounds(game.id)
+
   const { data: rounds } = await client
     .from('rounds')
     .select('*')
-    .eq('game_id', gameId)
+    .eq('game_id', game.id)
     .eq('status', 'pending')
     .order('round_number')
     .limit(1)
 
-  const round = rounds?.[0]
+  const round = rounds?.[0] as Round | undefined
   if (!round) return null
 
-  const now = new Date()
-  const ends = new Date(now.getTime() + 20 * 1000) // 20 seconds per question
+  const question = getQuestionById(round.question_id)
+  if (!question) return null
+
+  const timer = game.settings?.timer ?? 20
+  const data: RoundData = {}
+  if (question.type === 'order') {
+    let perm = shuffle(question.items.map((_, i) => i))
+    // Never show the items already in the right order.
+    if (perm.every((p, i) => p === i)) perm = [...perm.slice(1), perm[0]]
+    data.perm = perm
+  }
+  if (question.type === 'mostlikely') {
+    data.players = players
+      .filter((p) => !p.is_game_master)
+      .map((p) => ({ id: p.id, name: p.name, avatar: p.avatar }))
+  }
+  if (question.type === 'bluff') data.phase = 'write'
+
+  const startsAt = new Date(Date.now() + GET_READY_MS)
+  const seconds = answerWindowSeconds(question.type, timer, question.type === 'bluff' ? 'write' : 'answer')
+  const endsAt = new Date(startsAt.getTime() + seconds * 1000)
 
   await client
     .from('rounds')
     .update({
       status: 'active' as RoundStatus,
-      starts_at: now.toISOString(),
-      ends_at: ends.toISOString(),
+      data,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
     })
     .eq('id', round.id)
 
   await client
     .from('games')
     .update({ status: 'active' as GameStatus, current_round: round.round_number })
-    .eq('id', gameId)
+    .eq('id', game.id)
 
-  await logEvent(gameId, round.id, 'round_started', null, null, {
-    question_id: round.question_id,
-    round_number: round.round_number,
-  })
-
+  await logEvent(game.id, round.id, 'round_started', { round_number: round.round_number })
   return round
 }
 
-export async function lockAndRevealQuestion(roundId: string, gameId: string) {
-  const client = db()
+/** Bluff only: close the writing phase and open voting. */
+export async function startBluffVoting(game: Game, round: Round) {
+  const question = getQuestionById(round.question_id)
+  if (!question || question.type !== 'bluff') return { error: 'Not a bluff round.' }
 
-  // Lock round
-  await client.from('rounds').update({ status: 'locked' as RoundStatus }).eq('id', roundId)
+  const writes = (await getRoundActions(round.id)).filter((a) => a.action_type === 'bluff')
+  const options = buildBluffOptions(question, writes, round.id)
+  const startsAt = new Date(Date.now() + 1500)
+  const endsAt = new Date(startsAt.getTime() + answerWindowSeconds('bluff', game.settings?.timer ?? 20) * 1000)
 
-  // Get round info
-  const { data: round } = await client
+  // Only move on if the round is still in its writing phase.
+  const { data: updated } = await db()
     .from('rounds')
-    .select('question_id, round_number')
-    .eq('id', roundId)
-    .single()
-
-  if (!round) return
-
-  // Get the question
-  const allQuestions = Object.values(QUESTIONS).flat()
-  const question = allQuestions.find((q) => q.id === round.question_id)
-  if (!question) return
-
-  // Get all answers
-  const { data: actions } = await client
-    .from('actions')
-    .select('player_id, payload, created_at')
-    .eq('round_id', roundId)
-
-  const answers = actions ?? []
-  const totalAnswers = answers.length
-
-  // Tally stats
-  const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 }
-  for (const a of answers) {
-    const p = a.payload as { option_index: number }
-    counts[p.option_index] = (counts[p.option_index] ?? 0) + 1
-  }
-
-  const answerStats = [0, 1, 2, 3].map((idx) => ({
-    optionIndex: idx,
-    count: counts[idx] ?? 0,
-    percentage: totalAnswers > 0 ? ((counts[idx] ?? 0) / totalAnswers) * 100 : 0,
-  }))
-
-  // Sort correct answers by speed for bonus
-  const correctAnswers = answers
-    .filter((a) => (a.payload as { option_index: number }).option_index === question.correct)
-    .sort((a, b) => {
-      const ta = (a.payload as { time_taken_ms: number }).time_taken_ms ?? 99999
-      const tb = (b.payload as { time_taken_ms: number }).time_taken_ms ?? 99999
-      return ta - tb
+    .update({
+      status: 'voting' as RoundStatus,
+      data: { ...round.data, phase: 'vote', options },
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
     })
+    .eq('id', round.id)
+    .eq('status', 'active')
+    .select('id')
 
-  // Award points
-  for (let i = 0; i < correctAnswers.length; i++) {
-    const action = correctAnswers[i]
-    let pts = question.points
-    // Speed bonus: full bonus for 1st, half for 2nd, quarter for 3rd
-    if (i === 0) pts += question.speedBonus
-    else if (i === 1) pts += Math.floor(question.speedBonus / 2)
-    else if (i === 2) pts += Math.floor(question.speedBonus / 4)
-
-    await awardPoints(gameId, action.player_id, roundId, pts, `Correct answer Q${round.round_number}`)
-  }
-
-  // Mark round as revealing
-  await client.from('rounds').update({ status: 'revealing' as RoundStatus }).eq('id', roundId)
-  await client.from('games').update({ status: 'question_result' as GameStatus }).eq('id', gameId)
-
-  await logEvent(gameId, roundId, 'reveal_triggered', null, null, {
-    question_id: round.question_id,
-    correct_index: question.correct,
-    answer_stats: answerStats,
-  })
-
-  return { answerStats, correctIndex: question.correct }
+  if (!updated?.length) return { error: 'Voting already started.' }
+  await logEvent(game.id, round.id, 'voting_started', {})
+  return { error: null }
 }
 
-export async function completeQuestion(roundId: string, gameId: string) {
+export async function lockAndRevealQuestion(gameId: string, round: Round) {
   const client = db()
-  await client.from('rounds').update({ status: 'complete' as RoundStatus }).eq('id', roundId)
 
-  // Check if more questions remain
-  const { data: pending } = await client
+  // Lock atomically so a double tap cannot award points twice.
+  const { data: locked } = await client
+    .from('rounds')
+    .update({ status: 'locked' as RoundStatus })
+    .eq('id', round.id)
+    .in('status', ['active', 'voting'])
+    .select('id')
+  if (!locked?.length) return { error: 'Already revealed.' }
+
+  const question = getQuestionById(round.question_id)
+  if (!question) return { error: 'Question missing.' }
+
+  const [{ data: playerRows }, answers] = await Promise.all([
+    client.from('players').select('id, score, streak, best_streak').eq('game_id', gameId).eq('is_game_master', false),
+    getRoundActions(round.id),
+  ])
+  const players = (playerRows ?? []) as { id: string; score: number; streak: number; best_streak: number }[]
+
+  const graded = gradeRound({ question, data: round.data ?? {}, answers, players })
+
+  const before = Object.fromEntries(players.map((p) => [p.id, p.score]))
+  const after = Object.fromEntries(players.map((p) => [p.id, p.score + (graded.results[p.id]?.points ?? 0)]))
+
+  const scoreRows = players
+    .filter((p) => (graded.results[p.id]?.points ?? 0) > 0)
+    .map((p) => ({
+      game_id: gameId,
+      player_id: p.id,
+      round_id: round.id,
+      points: graded.results[p.id].points,
+      reason: `Q${round.round_number}`,
+    }))
+  if (scoreRows.length) await client.from('scores').insert(scoreRows)
+
+  await Promise.all(
+    players.map((p) => {
+      const r = graded.results[p.id]
+      return client
+        .from('players')
+        .update({
+          score: after[p.id],
+          streak: r?.streak ?? p.streak,
+          best_streak: Math.max(p.best_streak ?? 0, r?.streak ?? 0),
+        })
+        .eq('id', p.id)
+    }),
+  )
+
+  const payload = { ...graded, rank_before: computeRanks(before), rank_after: computeRanks(after) }
+
+  // Save the reveal before flipping the status so phones never see a reveal
+  // screen without its data.
+  await logEvent(gameId, round.id, 'reveal_triggered', payload as unknown as Record<string, unknown>)
+  await client.from('rounds').update({ status: 'revealing' as RoundStatus }).eq('id', round.id)
+  await client.from('games').update({ status: 'question_result' as GameStatus }).eq('id', gameId)
+
+  return { error: null }
+}
+
+export async function showLeaderboard(gameId: string) {
+  await completeOpenRounds(gameId)
+  await db().from('games').update({ status: 'leaderboard' as GameStatus }).eq('id', gameId)
+}
+
+export async function hasPendingRounds(gameId: string) {
+  const { data } = await db()
     .from('rounds')
     .select('id')
     .eq('game_id', gameId)
     .eq('status', 'pending')
     .limit(1)
-
-  if (!pending?.length) {
-    // No more questions — end game
-    await client.from('games').update({
-      status: 'finished' as GameStatus,
-      ended_at: new Date().toISOString(),
-    }).eq('id', gameId)
-    await logEvent(gameId, null, 'game_ended', null, null, {})
-    return 'finished'
-  }
-
-  // Ready for next question
-  await client.from('games').update({ status: 'category' as GameStatus }).eq('id', gameId)
-  return 'next'
+  return Boolean(data?.length)
 }
 
-// ─── Scoring ───────────────────────────────────────────────────────────────
-
-export async function awardPoints(
-  gameId: string,
-  playerId: string,
-  roundId: string,
-  points: number,
-  reason: string
-) {
+export async function finishGame(gameId: string) {
   const client = db()
-  await client.from('scores').insert({ game_id: gameId, player_id: playerId, round_id: roundId, points, reason })
-  const { data: player } = await client.from('players').select('score').eq('id', playerId).single()
-  await client.from('players').update({ score: (player?.score ?? 0) + points }).eq('id', playerId)
+  await completeOpenRounds(gameId)
+
+  const [reveals, { data: players }] = await Promise.all([
+    getAllReveals(gameId),
+    client.from('players').select('id, score, best_streak').eq('game_id', gameId).eq('is_game_master', false),
+  ])
+  const awards = computeAwards(reveals, players ?? [])
+
+  await client
+    .from('games')
+    .update({ status: 'finished' as GameStatus, ended_at: new Date().toISOString() })
+    .eq('id', gameId)
+  await logEvent(gameId, null, 'game_ended', { awards })
 }
 
 // ─── Events ────────────────────────────────────────────────────────────────
@@ -201,17 +269,13 @@ export async function logEvent(
   gameId: string,
   roundId: string | null,
   eventType: string,
-  actorId: string | null,
-  targetId: string | null,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
 ) {
-  const client = db()
-  await client.from('events').insert({
+  await db().from('events').insert({
     game_id: gameId,
     round_id: roundId,
     event_type: eventType,
-    actor_id: actorId,
-    target_id: targetId,
     payload,
   })
 }
+

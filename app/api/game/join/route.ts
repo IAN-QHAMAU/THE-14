@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/db/supabase'
 import { getGameByCode } from '@/lib/db/queries'
 import { encodeSession, sessionCookieOptions } from '@/lib/auth/session'
+import { isValidAvatar } from '@/lib/avatar'
 
 export async function POST(req: NextRequest) {
   const { gameCode, playerName, avatar } = await req.json()
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     .insert({
       game_id: game.id,
       name: playerName.trim().slice(0, 24),
-      avatar: avatar ?? 'ninja',
+      avatar: isValidAvatar(avatar) ? avatar : 'ninja',
       is_game_master: false,
       is_connected: true,
       score: 0,

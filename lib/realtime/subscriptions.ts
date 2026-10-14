@@ -1,66 +1,53 @@
 import { supabase } from '@/lib/db/supabase'
-import type { Game, Player, Round, GameEvent } from '@/types'
 
-export function subscribeToGame(gameId: string, onUpdate: (game: Game) => void) {
+// Each subscription just signals that something changed; callers refetch the
+// full state from the API, which filters out anything players should not see.
+
+export function subscribeToGame(gameId: string, onChange: () => void) {
   return supabase
     .channel(`game:${gameId}`)
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
-      (payload) => onUpdate(payload.new as Game)
-    )
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, onChange)
     .subscribe()
 }
 
-export function subscribeToPlayers(gameId: string, onUpdate: (players: Player[]) => void) {
+export function subscribeToPlayers(gameId: string, onChange: () => void) {
   return supabase
     .channel(`players:${gameId}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
-      async () => {
-        const { data } = await supabase
-          .from('players')
-          .select('*')
-          .eq('game_id', gameId)
-          .order('joined_at')
-        if (data) onUpdate(data as Player[])
-      }
-    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` }, onChange)
     .subscribe()
 }
 
-export function subscribeToRounds(gameId: string, onUpdate: (round: Round) => void) {
+export function subscribeToRounds(gameId: string, onChange: () => void) {
   return supabase
     .channel(`rounds:${gameId}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'rounds', filter: `game_id=eq.${gameId}` },
-      (payload) => {
-        if (payload.new) onUpdate(payload.new as Round)
-      }
-    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `game_id=eq.${gameId}` }, onChange)
     .subscribe()
 }
 
-export function subscribeToEvents(gameId: string, onEvent: (event: GameEvent) => void) {
+export function subscribeToEvents(gameId: string, onChange: () => void) {
   return supabase
     .channel(`events:${gameId}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'events', filter: `game_id=eq.${gameId}` },
-      (payload) => onEvent(payload.new as GameEvent)
-    )
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events', filter: `game_id=eq.${gameId}` }, onChange)
     .subscribe()
 }
 
-export function subscribeToActions(roundId: string, onUpdate: () => void) {
+export function subscribeToActions(roundId: string, onChange: () => void) {
   return supabase
     .channel(`actions:${roundId}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'actions', filter: `round_id=eq.${roundId}` },
-      () => onUpdate()
-    )
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'actions', filter: `round_id=eq.${roundId}` }, onChange)
+    .subscribe()
+}
+
+// Live emoji reactions use a broadcast channel. Nothing is stored.
+export interface ReactionMessage {
+  emoji: string
+  player_id: string
+  name: string
+}
+
+export function reactionChannel(gameId: string, onReaction: (r: ReactionMessage) => void) {
+  return supabase
+    .channel(`reactions:${gameId}`, { config: { broadcast: { self: true } } })
+    .on('broadcast', { event: 'react' }, ({ payload }) => onReaction(payload as ReactionMessage))
     .subscribe()
 }

@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- THE 14 — Quiz Edition
+-- THE 14: Quiz Edition
 -- Database Schema
 --
 -- Setup instructions:
@@ -22,7 +22,7 @@ drop table if exists games     cascade;
 
 -- ─── GAMES ────────────────────────────────────────────────────────────────────
 -- One row per game session.
--- status flow: waiting → category → active → question_result → finished
+-- status flow: waiting → category → active → question_result → leaderboard → ... → finished
 
 create table games (
   id               uuid primary key default gen_random_uuid(),
@@ -32,6 +32,7 @@ create table games (
   max_players      integer not null default 14,
   category         text,
   total_questions  integer not null default 0,
+  settings         jsonb not null default '{}',
   created_at       timestamptz not null default now(),
   started_at       timestamptz,
   ended_at         timestamptz
@@ -51,13 +52,15 @@ create table players (
   joined_at       timestamptz not null default now(),
   last_seen_at    timestamptz not null default now(),
   score           integer not null default 0,
+  streak          integer not null default 0,
+  best_streak     integer not null default 0,
   status          text not null default 'waiting'
 );
 
 -- ─── ROUNDS ───────────────────────────────────────────────────────────────────
 -- One row per question. Created in bulk when GM starts the game.
 -- question_id references a question in the app's questions.ts file (not in DB).
--- status flow: pending → active → locked → revealing → complete
+-- status flow: pending → active → (voting) → locked → revealing → complete
 
 create table rounds (
   id            uuid primary key default gen_random_uuid(),
@@ -67,14 +70,16 @@ create table rounds (
   description   text not null,
   question_id   text not null,
   status        text not null default 'pending',
+  data          jsonb not null default '{}',
   starts_at     timestamptz,
   ends_at       timestamptz,
   created_at    timestamptz not null default now()
 );
 
 -- ─── ACTIONS ──────────────────────────────────────────────────────────────────
--- One row per player per round. Records the answer they submitted.
--- payload: { option_index, answered_at, time_taken_ms }
+-- One row per player per round and action type. Records what they submitted.
+-- action_type: 'answer' (every round) or 'bluff' (the fake answer in Bluff rounds)
+-- payload: { option_index | value | order | text, answered_at, time_taken_ms, too_fast }
 -- unique constraint prevents double submissions.
 
 create table actions (
@@ -84,7 +89,7 @@ create table actions (
   action_type  text not null default 'answer',
   payload      jsonb not null default '{}',
   created_at   timestamptz not null default now(),
-  unique (round_id, player_id)
+  constraint actions_round_player_type_key unique (round_id, player_id, action_type)
 );
 
 -- ─── EVENTS ───────────────────────────────────────────────────────────────────
@@ -132,7 +137,7 @@ create index on scores(player_id);
 
 -- ─── ROW LEVEL SECURITY ───────────────────────────────────────────────────────
 -- All writes go through API routes using the service role key (bypasses RLS).
--- Public read is allowed — sensitive data like answers are filtered in the API.
+-- Public read is allowed. Sensitive data like answers are filtered in the API.
 
 alter table games   enable row level security;
 alter table players enable row level security;
@@ -150,7 +155,7 @@ create policy "actions_read" on actions for select using (true);
 
 -- ─── REALTIME ─────────────────────────────────────────────────────────────────
 -- Enables live updates for game state, players, questions and events.
--- scores is excluded — read via API only.
+-- scores is excluded. Read via API only.
 
 alter publication supabase_realtime add table games;
 alter publication supabase_realtime add table players;
