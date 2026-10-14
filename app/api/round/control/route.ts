@@ -1,15 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
-import { getGameById, getCurrentRound } from '@/lib/db/queries'
+import { getGameById, getCurrentRound, getPlayers } from '@/lib/db/queries'
 import {
   setupGame,
   startNextQuestion,
+  startBluffVoting,
   lockAndRevealQuestion,
-  completeQuestion,
+  showLeaderboard,
+  hasPendingRounds,
+  finishGame,
+  resetGame,
 } from '@/lib/game/stateMachine'
-import { createServerSupabase } from '@/lib/db/supabase'
-import type { Category } from '@/lib/game/questions'
-import type { GameStatus } from '@/types'
+import {
+  ALL_TYPES,
+  MAX_QUESTIONS,
+  MIN_QUESTIONS,
+  PICKABLE_CATEGORIES,
+  TIMER_OPTIONS,
+  type Category,
+  type GameSettings,
+  type QuestionType,
+} from '@/lib/game/questions'
+
+function parseSettings(raw: unknown): GameSettings | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const categories = (Array.isArray(r.categories) ? r.categories : []).filter((c): c is Category =>
+    PICKABLE_CATEGORIES.includes(c as Category),
+  )
+  const types = (Array.isArray(r.types) ? r.types : []).filter((t): t is QuestionType =>
+    ALL_TYPES.includes(t as QuestionType),
+  )
+  if (!types.length) return null
+  const timer = TIMER_OPTIONS.includes(Number(r.timer)) ? Number(r.timer) : 20
+  const questionCount = Math.min(MAX_QUESTIONS, Math.max(MIN_QUESTIONS, Number(r.questionCount) || 10))
+  return { categories: [...new Set(categories)], types: [...new Set(types)], timer, questionCount }
+}
 
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -18,59 +44,79 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { action, category, questionCount } = body
+  const { action } = body
   const { gameId } = session
-  const db = createServerSupabase()
 
   const game = await getGameById(gameId)
   if (!game) return NextResponse.json({ error: 'Game not found.' }, { status: 404 })
 
   switch (action) {
     case 'start_game': {
-      if (!category) {
-        return NextResponse.json({ error: 'Category required.' }, { status: 400 })
+      if (game.status !== 'waiting') {
+        return NextResponse.json({ error: 'Game already started.' }, { status: 400 })
       }
-      const count = Math.min(25, Math.max(5, Number(questionCount) || 10))
-      await setupGame(gameId, category as Category, count)
+      const settings = parseSettings(body.settings)
+      if (!settings) return NextResponse.json({ error: 'Pick at least one game type.' }, { status: 400 })
+      const { error } = await setupGame(gameId, settings)
+      if (error) return NextResponse.json({ error }, { status: 400 })
       return NextResponse.json({ success: true })
     }
 
     case 'next_question': {
-      const round = await startNextQuestion(gameId)
-      if (!round) {
-        return NextResponse.json({ error: 'No more questions.' }, { status: 400 })
+      if (!['category', 'question_result', 'leaderboard'].includes(game.status)) {
+        return NextResponse.json({ error: 'Finish the current question first.' }, { status: 400 })
       }
-      return NextResponse.json({ success: true, roundId: round.id })
+      if (!(await hasPendingRounds(gameId))) {
+        await finishGame(gameId)
+        return NextResponse.json({ success: true, finished: true })
+      }
+      const players = await getPlayers(gameId)
+      const round = await startNextQuestion(game, players)
+      if (!round) return NextResponse.json({ error: 'Could not start the next question.' }, { status: 500 })
+      return NextResponse.json({ success: true })
+    }
+
+    case 'start_voting': {
+      const round = await getCurrentRound(gameId)
+      if (!round || round.status !== 'active') {
+        return NextResponse.json({ error: 'No question in progress.' }, { status: 400 })
+      }
+      const { error } = await startBluffVoting(game, round)
+      if (error) return NextResponse.json({ error }, { status: 400 })
+      return NextResponse.json({ success: true })
     }
 
     case 'lock_question': {
       const round = await getCurrentRound(gameId)
-      if (!round || round.status !== 'active') {
-        return NextResponse.json({ error: 'No active question.' }, { status: 400 })
+      if (!round || !['active', 'voting'].includes(round.status)) {
+        return NextResponse.json({ error: 'No question in progress.' }, { status: 400 })
       }
-      const result = await lockAndRevealQuestion(round.id, gameId)
-      return NextResponse.json({ success: true, ...result })
-    }
-
-    case 'next_round': {
-      const round = await getCurrentRound(gameId)
-      if (!round) {
-        return NextResponse.json({ error: 'No current round.' }, { status: 400 })
+      if (round.data?.phase === 'write') {
+        return NextResponse.json({ error: 'Start voting first.' }, { status: 400 })
       }
-      const result = await completeQuestion(round.id, gameId)
-      return NextResponse.json({ success: true, result })
-    }
-
-    case 'end_game': {
-      await db.from('games').update({
-        status: 'finished' as GameStatus,
-        ended_at: new Date().toISOString(),
-      }).eq('id', gameId)
+      const { error } = await lockAndRevealQuestion(gameId, round)
+      if (error) return NextResponse.json({ error }, { status: 400 })
       return NextResponse.json({ success: true })
     }
 
-    case 'pause_game': {
-      await db.from('games').update({ status: 'waiting' as GameStatus }).eq('id', gameId)
+    case 'show_leaderboard': {
+      if (game.status !== 'question_result') {
+        return NextResponse.json({ error: 'Reveal the answer first.' }, { status: 400 })
+      }
+      await showLeaderboard(gameId)
+      return NextResponse.json({ success: true })
+    }
+
+    case 'end_game': {
+      if (game.status === 'waiting' || game.status === 'finished') {
+        return NextResponse.json({ error: 'Nothing to end.' }, { status: 400 })
+      }
+      await finishGame(gameId)
+      return NextResponse.json({ success: true })
+    }
+
+    case 'play_again': {
+      await resetGame(gameId)
       return NextResponse.json({ success: true })
     }
 

@@ -1,172 +1,151 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/db/supabase'
-import { subscribeToGame, subscribeToPlayers, subscribeToRounds, subscribeToEvents } from '@/lib/realtime/subscriptions'
+import { useGameState } from '@/lib/hooks/useGameState'
 import { WaitingRoom } from '@/components/game/WaitingRoom'
-import { CategoryReveal } from '@/components/game/CategoryReveal'
-import { QuestionScreen } from '@/components/game/QuestionScreen'
+import { GameIntro } from '@/components/game/GameIntro'
+import { QuestionScreen, type SubmitBody } from '@/components/game/QuestionScreen'
 import { QuestionResult } from '@/components/game/QuestionResult'
-import { Podium } from '@/components/game/Podium'
-import type { Game, Player, Round, GameEvent, AnswerStat, PlayerScoreEntry } from '@/types'
-import type { Question } from '@/lib/game/questions'
+import { Standings } from '@/components/game/Standings'
+import { Podium, shareResult } from '@/components/game/Podium'
+import { ReactionBar, ReactionLayer, useReactions } from '@/components/game/Reactions'
+import { SoundToggle } from '@/components/ui/SoundToggle'
+import { Button } from '@/components/ui/Button'
 
-interface StateData {
-  game: Game
-  players: Player[]
-  myPlayer: Player | null
-  currentRound: Round | null
-  currentQuestion: (Question & { correct: number }) | null
-  submitted: boolean
-  selectedOption: number | null
-  revealData: { correct_index: number; answer_stats: AnswerStat[] } | null
-  scores: PlayerScoreEntry[]
-  myRank: number
-  myScore: number
-  events: GameEvent[]
-  isGameMaster: boolean
+function Dark({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="relative min-h-[100dvh] bg-stone-900 text-stone-50 flex flex-col px-4 py-10">
+      <div className="absolute top-4 right-4">
+        <SoundToggle dark />
+      </div>
+      <div className="max-w-md mx-auto w-full flex-1 flex flex-col justify-center">{children}</div>
+    </main>
+  )
 }
 
 export default function RoomPage() {
   const router = useRouter()
-  const [state, setState] = useState<StateData | null>(null)
-  const [error, setError] = useState('')
-  const questionStartRef = useRef<number>(Date.now())
+  const toJoin = useCallback(() => router.push('/join'), [router])
+  const { state, error, refresh } = useGameState({ onUnauthorized: toJoin })
+  const [shareNote, setShareNote] = useState('')
 
-  const fetchState = useCallback(async () => {
-    const res = await fetch('/api/game/state')
-    if (res.status === 401) { router.push('/join'); return }
-    if (!res.ok) { setError('Could not load game.'); return }
-    const data = await res.json()
-    setState(data)
-  }, [router])
+  const me = useMemo(
+    () => (state?.myPlayer ? { id: state.myPlayer.id, name: state.myPlayer.name } : undefined),
+    [state?.myPlayer],
+  )
+  const { items, send } = useReactions(state?.game.id, me)
 
-  useEffect(() => { fetchState() }, [fetchState])
-
-  // Track when question changes to measure response time
-  useEffect(() => {
-    if (state?.currentRound?.status === 'active') {
-      questionStartRef.current = Date.now()
+  async function handleSubmit(body: SubmitBody) {
+    try {
+      const res = await fetch('/api/action/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) return { error: data.error ?? 'Could not submit.' }
+      void refresh()
+      return { tooFast: Boolean(data.tooFast) }
+    } catch {
+      return { error: 'Connection problem. Try again.' }
     }
-  }, [state?.currentRound?.id, state?.currentRound?.status])
-
-  useEffect(() => {
-    if (!state?.game?.id) return
-    const gid = state.game.id
-
-    const subs = [
-      subscribeToGame(gid, () => fetchState()),
-      subscribeToPlayers(gid, () => fetchState()),
-      subscribeToRounds(gid, () => fetchState()),
-      subscribeToEvents(gid, () => fetchState()),
-    ]
-    return () => subs.forEach((s) => supabase.removeChannel(s))
-  }, [state?.game?.id, fetchState])
-
-  async function handleAnswer(optionIndex: number) {
-    const timeTakenMs = Date.now() - questionStartRef.current
-    const res = await fetch('/api/action/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ optionIndex, timeTakenMs }),
-    })
-    if (!res.ok) {
-      const d = await res.json()
-      throw new Error(d.error ?? 'Submit failed')
-    }
-    await fetchState()
-  }
-
-  if (error) {
-    return (
-      <main className="min-h-screen bg-stone-50 flex items-center justify-center px-6">
-        <div className="text-center space-y-4">
-          <p className="text-stone-600">{error}</p>
-          <button onClick={() => router.push('/join')} className="text-sm underline text-stone-500">
-            Back to join
-          </button>
-        </div>
-      </main>
-    )
   }
 
   if (!state) {
     return (
-      <main className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <p className="text-xs text-stone-400 tracking-widest uppercase animate-pulse">Loading…</p>
+      <main className="min-h-[100dvh] bg-stone-50 flex items-center justify-center px-6">
+        {error ? (
+          <div className="text-center space-y-4">
+            <p className="text-stone-600">{error}</p>
+            <button onClick={toJoin} className="text-sm underline text-stone-500">
+              Back to join
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-stone-400 tracking-widest uppercase animate-pulse">Loading</p>
+        )}
       </main>
     )
   }
 
-  const {
-    game, players, myPlayer, currentRound, currentQuestion,
-    submitted, selectedOption, revealData, scores, myRank, myScore,
-  } = state
-
-  // Redirect GM
   if (state.isGameMaster) {
     router.push('/gm/control')
     return null
   }
 
-  // ── State machine ──────────────────────────────────────────────
+  const { game, myPlayer } = state
 
   if (game.status === 'waiting') {
-    return <WaitingRoom game={game} players={players} myPlayer={myPlayer} />
+    return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} />
   }
 
   if (game.status === 'finished') {
-    return <Podium scores={scores} myPlayerId={myPlayer?.id ?? ''} />
-  }
-
-  if (game.status === 'question_result' && currentQuestion && revealData) {
-    const answerStats: AnswerStat[] = revealData.answer_stats ?? []
+    const summary = `THE 14: I finished ${state.myRank} of ${state.scores.length} with ${state.myScore} points.`
     return (
-      <QuestionResult
-        question={{ ...currentQuestion, correct: revealData.correct_index }}
-        selectedOption={selectedOption}
-        pointsEarned={0}
-        answerStats={answerStats}
-        myRank={myRank}
-        totalPlayers={players.filter((p) => !p.is_game_master).length}
-        myScore={myScore}
-      />
+      <Dark>
+        <ReactionLayer items={items} />
+        <Podium scores={state.scores} awards={state.awards} myPlayerId={myPlayer?.id}>
+          <div className="space-y-4">
+            <ReactionBar onSend={send} dark />
+            <Button
+              variant="secondary"
+              className="w-full bg-transparent border-stone-700 text-stone-300 hover:bg-stone-800"
+              onClick={async () => {
+                const r = await shareResult(summary)
+                setShareNote(r === 'copied' ? 'Copied.' : r === 'failed' ? 'Could not share.' : '')
+              }}
+            >
+              Share result
+            </Button>
+            {shareNote && <p className="text-xs text-center text-stone-500">{shareNote}</p>}
+          </div>
+        </Podium>
+      </Dark>
     )
   }
 
-  if (game.status === 'active' && currentRound?.status === 'active' && currentQuestion) {
+  if (game.status === 'question_result' && state.reveal) {
     return (
-      <QuestionScreen
-        question={currentQuestion}
-        questionNumber={currentRound.round_number}
-        totalQuestions={game.total_questions}
-        submitted={submitted}
-        selectedOption={selectedOption}
-        endsAt={currentRound.ends_at ?? new Date(Date.now() + 20000).toISOString()}
-        onAnswer={handleAnswer}
-      />
+      <>
+        <ReactionLayer items={items} />
+        <QuestionResult state={state} onReact={send} />
+      </>
     )
   }
 
-  // Category reveal / between questions
+  if (game.status === 'leaderboard') {
+    return (
+      <Dark>
+        <ReactionLayer items={items} />
+        <div className="space-y-8">
+          <Standings
+            scores={state.scores}
+            lastReveal={state.lastReveal}
+            myPlayerId={myPlayer?.id}
+            subtitle={`After question ${game.current_round} of ${game.total_questions}`}
+          />
+          <ReactionBar onSend={send} dark />
+        </div>
+      </Dark>
+    )
+  }
+
+  if (game.status === 'active' && state.currentRound && state.currentQuestion) {
+    return <QuestionScreen state={state} onSubmit={handleSubmit} />
+  }
+
+  if (game.status === 'category') {
+    return (
+      <Dark>
+        <GameIntro game={game} />
+      </Dark>
+    )
+  }
+
+  // Brief in-between moments while the next screen loads.
   return (
-    <main className="min-h-screen bg-stone-50 flex items-center justify-center px-6">
-      
-  {game.category ? (
-    <CategoryReveal
-      category={game.category}
-      totalQuestions={game.total_questions}
-      currentQuestion={game.current_round}
-      scores={scores}
-    />
-  ) : (
-    <div className="text-center space-y-2">
-      <p className="text-sm text-stone-500">
-        Waiting for the game to begin.
-      </p>
-    </div>
-  )}
-
-    </main>
+    <Dark>
+      <p className="text-center text-sm text-stone-500 animate-pulse">One moment.</p>
+    </Dark>
   )
 }

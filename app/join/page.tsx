@@ -1,17 +1,20 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { AvatarPicker, AVATARS } from '@/components/ui/Avatar'
+import { AvatarPicker, defaultAvatar } from '@/components/ui/Avatar'
 
 export default function JoinPage() {
   const router = useRouter()
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [avatar, setAvatar] = useState(AVATARS[0].id)
+  const [avatar, setAvatar] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Random look on first load. Done after mount so server and client agree.
+  useEffect(() => setAvatar(defaultAvatar()), [])
 
   async function handleJoin() {
     setError('')
@@ -37,7 +40,7 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="min-h-screen bg-stone-50 flex flex-col items-center justify-center px-6 py-10">
+    <main className="min-h-[100dvh] bg-stone-50 flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm space-y-8">
         <div>
           <h1 className="text-4xl font-light tracking-tight text-stone-900">THE 14</h1>
@@ -64,7 +67,7 @@ export default function JoinPage() {
             maxLength={24}
             autoComplete="off"
           />
-          <AvatarPicker selected={avatar} onSelect={setAvatar} />
+          {avatar && <AvatarPicker selected={avatar} onSelect={setAvatar} />}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

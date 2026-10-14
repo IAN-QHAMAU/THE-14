@@ -1,27 +1,7 @@
-export type Category = 'general' | 'sports' | 'cars' | 'anime' | 'music' | 'facts' | 'kenya' | 'food' | 'movies' | 'gaming' | 'internet'
-export interface Question {
-  id: string
-  category: Category
-  question: string
-  options: string[]
-  correct: number // index of correct option
-  points: number
-  speedBonus: number
-}
-export const CATEGORIES: Record<Category, { label: string; emoji: string; color: string; questionCount: number }> = {
-  general:  { label: 'General Knowledge', emoji: '🧠', color: 'bg-stone-800',   questionCount: 20 },
-  sports:   { label: 'Sports',            emoji: '⚽', color: 'bg-emerald-800', questionCount: 15 },
-  cars:     { label: 'Cars',              emoji: '🚗', color: 'bg-red-800',     questionCount: 15 },
-  anime:    { label: 'Anime',             emoji: '⛩️', color: 'bg-purple-800',  questionCount: 20 },
-  music:    { label: 'Music',             emoji: '🎵', color: 'bg-blue-800',    questionCount: 15 },
-  facts:    { label: 'Wild Facts',        emoji: '⚡', color: 'bg-amber-800',   questionCount: 12 },
-  kenya:    { label: 'Kenya & East Africa', emoji: '🇰🇪', color: 'bg-green-800', questionCount: 8 },
-  food:     { label: 'Food & Drinks',       emoji: '🍕', color: 'bg-orange-800', questionCount: 8 },
-  movies:   { label: 'Movies & TV',         emoji: '🎬', color: 'bg-indigo-800', questionCount: 8 },
-  gaming:   { label: 'Gaming',              emoji: '🎮', color: 'bg-violet-800', questionCount: 8 },
-  internet: { label: 'Internet Culture',    emoji: '📱', color: 'bg-pink-800', questionCount: 8 },
-}
-export const QUESTIONS: Record<Category, Question[]> = {
+import type { RawChoiceQuestion, Category } from './schema'
+
+// Original classic multiple choice questions.
+export const CLASSIC_QUESTIONS: Partial<Record<Category, RawChoiceQuestion[]>> = {
   general: [
     { id: 'g1',  category: 'general', question: 'What is the capital of Japan?',                                         options: ['Beijing','Seoul','Tokyo','Bangkok'],                                    correct: 2, points: 100, speedBonus: 50 },
     { id: 'g2',  category: 'general', question: 'How many continents are there on Earth?',                               options: ['5','6','7','8'],                                                        correct: 2, points: 100, speedBonus: 50 },
@@ -188,9 +168,4 @@ export const QUESTIONS: Record<Category, Question[]> = {
   ],
 
 
-}
-
-export function getQuestionsForCategory(category: Category, count?: number): Question[] {
-  const qs = [...QUESTIONS[category]].sort(() => Math.random() - 0.5)
-  return count ? qs.slice(0, count) : qs
 }

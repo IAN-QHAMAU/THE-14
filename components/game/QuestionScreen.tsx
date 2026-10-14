@@ -1,226 +1,184 @@
-
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { CATEGORIES, type Question } from '@/lib/game/questions'
-import { Countdown } from '@/components/ui/Countdown'
+import { useEffect, useState } from 'react'
+import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
+import { TimerBar } from '@/components/ui/Countdown'
+import { SoundToggle } from '@/components/ui/SoundToggle'
+import { GetReady } from '@/components/game/GetReady'
+import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PlayerVote, PromptExtras } from '@/components/game/answers'
+import { useServerNow } from '@/lib/clock'
+import { quickTapLine } from '@/lib/game/lines'
+import { sound } from '@/lib/sound'
+import { cn } from '@/lib/utils'
+import type { GameStateResponse } from '@/types'
+
+export interface SubmitBody {
+  optionIndex?: number
+  value?: number
+  order?: number[]
+  text?: string
+}
 
 interface Props {
-  question: Question
-  questionNumber: number
-  totalQuestions: number
-  submitted: boolean
-  selectedOption: number | null
-  endsAt: string
-  onAnswer: (optionIndex: number) => Promise<void>
-  answeredCount?: number
-  eligiblePlayerCount?: number
+  state: GameStateResponse
+  onSubmit: (body: SubmitBody) => Promise<{ tooFast?: boolean; error?: string }>
 }
 
-function getReaction(timeTakenMs: number): string {
-  if (timeTakenMs < 3000) return 'Instant.'
-  if (timeTakenMs < 7000) return 'Quick.'
-  if (timeTakenMs < 12000) return 'Made it.'
-  if (timeTakenMs < 20000) return 'Just in time.'
-  return 'Too slow.'
-}
+export function QuestionScreen({ state, onSubmit }: Props) {
+  const { currentRound: round, currentQuestion: q, game, myPlayer } = state
+  const now = useServerNow(200)
+  const [pending, setPending] = useState<SubmitBody | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-export function QuestionScreen({
-  question,
-  questionNumber,
-  totalQuestions,
-  submitted,
-  selectedOption,
-  endsAt,
-  onAnswer,
-  answeredCount,
-  eligiblePlayerCount,
-}: Props) {
-  const [loading, setLoading] = useState(false)
-  const [localSelected, setLocalSelected] =
-    useState<number | null>(selectedOption)
-  const [appeared, setAppeared] = useState(false)
-  const [reaction, setReaction] = useState<string | null>(null)
-
-  const startTime = useRef(Date.now())
-  const cat = CATEGORIES[question.category]
+  const phase = round?.data?.phase === 'write' ? 'write' : 'answer'
+  const phaseKey = `${round?.id}:${phase}`
 
   useEffect(() => {
-    startTime.current = Date.now()
-    setLocalSelected(selectedOption)
-    setReaction(null)
-    setLoading(false)
-    setAppeared(false)
+    setPending(null)
+    setBusy(false)
+    setNote(null)
+    setError(null)
+  }, [phaseKey])
 
-    const timer = setTimeout(() => setAppeared(true), 80)
+  if (!round || !q || !round.starts_at || !round.ends_at) return null
 
-    return () => clearTimeout(timer)
-    // Reset the timer only when the active question changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [question.id])
+  const startsAt = Date.parse(round.starts_at)
+  const endsAt = Date.parse(round.ends_at)
+  const isVote = q.type === 'bluff' && phase === 'answer'
 
-  useEffect(() => {
-    setLocalSelected(selectedOption)
-  }, [selectedOption])
-
-  useEffect(() => {
-    if (submitted || localSelected !== null || reaction !== null) return
-
-    const deadline = Date.parse(endsAt)
-    if (!Number.isFinite(deadline)) return
-
-    const remaining = deadline - Date.now()
-
-    if (remaining <= 0) {
-      setReaction('Too slow.')
-      return
-    }
-
-    const timer = setTimeout(() => {
-      setReaction('Too slow.')
-    }, remaining)
-
-    return () => clearTimeout(timer)
-  }, [endsAt, submitted, localSelected, reaction])
-
-  async function handleAnswer(idx: number) {
-    if (submitted || loading || localSelected !== null) return
-
-    const deadline = Date.parse(endsAt)
-
-    if (Number.isFinite(deadline) && Date.now() >= deadline) {
-      setReaction('Too slow.')
-      return
-    }
-
-    const timeTakenMs = Date.now() - startTime.current
-
-    setLocalSelected(idx)
-    setReaction(getReaction(timeTakenMs))
-    setLoading(true)
-
-    try {
-      await onAnswer(idx)
-    } catch {
-      setLocalSelected(null)
-      setReaction(null)
-    } finally {
-      setLoading(false)
-    }
+  if (now < startsAt) {
+    return (
+      <main className="min-h-[100dvh] bg-stone-900 text-stone-50 flex items-center justify-center px-6">
+        <GetReady
+          question={q}
+          number={round.round_number}
+          total={game.total_questions}
+          startsAt={round.starts_at}
+          label={isVote ? 'Voting time' : undefined}
+        />
+      </main>
+    )
   }
 
-  const optionLabels = ['A', 'B', 'C', 'D']
+  const timeUp = now > endsAt
+  const serverAnswer = state.myAnswer
+  const done = phase === 'write' ? Boolean(state.myBluff) : Boolean(serverAnswer) || pending !== null
+  const locked = done || timeUp || busy
+  const cat = CATEGORIES[q.category]
+  const type = GAME_TYPES[q.type]
 
-  const hasSubmissionCount =
-    Number.isInteger(answeredCount) &&
-    Number.isInteger(eligiblePlayerCount) &&
-    answeredCount! >= 0 &&
-    eligiblePlayerCount! >= 0
+  async function submit(body: SubmitBody) {
+    if (locked) return
+    sound.unlock()
+    sound.tap()
+    setPending(body)
+    setBusy(true)
+    setError(null)
+    const res = await onSubmit(body)
+    setBusy(false)
+    if (res.error) {
+      setPending(null)
+      setError(res.error)
+      return
+    }
+    if (res.tooFast) setNote(quickTapLine(`${myPlayer?.id}:${q?.id}`))
+  }
+
+  const selectedIndex = pending?.optionIndex ?? serverAnswer?.option_index ?? null
+
+  // The bluffer's own fake is shown but cannot be picked.
+  const ownIndex =
+    isVote && state.myBluff
+      ? (q.options ?? []).findIndex((o) => o.trim().toLowerCase() === state.myBluff!.trim().toLowerCase())
+      : null
+
+  let body: React.ReactNode
+  if (q.type === 'bluff' && phase === 'write') {
+    body = <BluffWrite disabled={timeUp || busy} submitted={state.myBluff} onSubmit={(text) => submit({ text })} />
+  } else if (q.type === 'mostlikely') {
+    body = (
+      <PlayerVote
+        players={round.data?.players ?? []}
+        selected={selectedIndex}
+        disabled={locked}
+        onPick={(optionIndex) => submit({ optionIndex })}
+      />
+    )
+  } else if (q.type === 'closest') {
+    body = (
+      <ClosestInput
+        question={q}
+        disabled={locked}
+        submitted={pending?.value ?? serverAnswer?.value ?? null}
+        onSubmit={(value) => submit({ value })}
+      />
+    )
+  } else if (q.type === 'order') {
+    body = (
+      <OrderPicker
+        items={q.options ?? []}
+        disabled={locked}
+        submitted={pending?.order ?? serverAnswer?.order ?? null}
+        onSubmit={(order) => submit({ order })}
+      />
+    )
+  } else {
+    body = (
+      <OptionPad
+        options={q.options ?? []}
+        selected={selectedIndex}
+        disabled={locked}
+        disabledIndex={ownIndex !== null && ownIndex >= 0 ? ownIndex : null}
+        onPick={(optionIndex) => submit({ optionIndex })}
+      />
+    )
+  }
+
+  const totalPlayers = state.players.filter((p) => !p.is_game_master).length
+  const status = error
+    ? error
+    : note
+      ? note
+      : done
+        ? phase === 'write' ? 'Fake submitted.' : 'Locked in.'
+        : timeUp
+          ? 'Time is up.'
+          : null
 
   return (
-    <main className="min-h-screen bg-stone-50 flex flex-col px-4 py-8">
-      <div className="max-w-sm mx-auto w-full flex flex-col gap-6 flex-1">
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{cat.emoji}</span>
-            <span className="text-xs text-stone-400 tracking-widest uppercase">
-              {cat.label}
+    <main className="min-h-[100dvh] bg-stone-50 flex flex-col px-4 pt-6 pb-8 safe-top">
+      <div className="max-w-md mx-auto w-full flex flex-col gap-5 flex-1">
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-lg">{q.category === 'party' ? '🎉' : cat.emoji}</span>
+            <span className="text-xs text-stone-400 tracking-widest uppercase truncate">
+              {round.round_number} / {game.total_questions} · {isVote ? 'Find the real answer' : type.short}
             </span>
           </div>
-          <Countdown endsAt={endsAt} />
+          <SoundToggle />
+        </header>
+
+        <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} ticking={!done} />
+
+        <div className="animate-fade-up space-y-3">
+          <h2 className="text-xl font-medium text-stone-900 leading-snug">{q.question}</h2>
+          <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} />
         </div>
 
-        <div className="flex gap-1">
-          {Array.from({ length: totalQuestions }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-0.5 flex-1 transition-all duration-300 ${
-                i < questionNumber - 1
-                  ? 'bg-stone-900'
-                  : i === questionNumber - 1
-                    ? 'bg-stone-500'
-                    : 'bg-stone-200'
-              }`}
-            />
-          ))}
-        </div>
+        <div className="flex-1">{body}</div>
 
-        <p className="text-xs text-stone-400 tracking-widest uppercase">
-          Question {questionNumber} of {totalQuestions}
-        </p>
-
-        <div
-          className={`transition-all duration-300 ${
-            appeared
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 translate-y-2'
-          }`}
-        >
-          <h2 className="text-lg font-medium text-stone-900 leading-snug">
-            {question.question}
-          </h2>
-          <p className="text-xs text-stone-400 mt-1">
-            {question.points} pts · +{question.speedBonus} speed bonus
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2.5 flex-1">
-          {question.options.map((opt, idx) => {
-            const isSelected = localSelected === idx
-            const timedOut = reaction === 'Too slow.'
-
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleAnswer(idx)}
-                disabled={
-                  submitted ||
-                  loading ||
-                  localSelected !== null ||
-                  timedOut
-                }
-                className={`w-full flex items-center gap-3 p-4 border-2 text-left transition-all duration-150 active:scale-[0.98] disabled:cursor-default ${
-                  isSelected
-                    ? 'border-stone-900 bg-stone-900 text-stone-50'
-                    : localSelected !== null || timedOut
-                      ? 'border-stone-100 bg-stone-50 text-stone-300'
-                      : 'border-stone-200 bg-white text-stone-800 hover:border-stone-400'
-                }`}
-              >
-                <span
-                  className={`w-7 h-7 flex-shrink-0 flex items-center justify-center text-xs font-bold border ${
-                    isSelected
-                      ? 'border-stone-50 text-stone-50'
-                      : localSelected !== null || timedOut
-                        ? 'border-stone-200 text-stone-300'
-                        : 'border-stone-300 text-stone-500'
-                  }`}
-                >
-                  {optionLabels[idx]}
-                </span>
-                <span className="text-sm leading-snug">{opt}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        <div
-          className="text-center py-2 space-y-2"
-          aria-live="polite"
-        >
-          {reaction && (
-            <p className="text-xs text-stone-400">{reaction}</p>
-          )}
-
-          {hasSubmissionCount && (
-            <p className="text-xs text-stone-400">
-              {Math.min(answeredCount!, eligiblePlayerCount!)} of{' '}
-              {eligiblePlayerCount} answered
+        <footer className="text-center space-y-1 min-h-[2.5rem]" aria-live="polite">
+          {status && (
+            <p key={status} className={cn('text-sm animate-fade-up', error ? 'text-rose-600 animate-nudge' : 'text-stone-500')}>
+              {status}
             </p>
           )}
-        </div>
+          <p className="text-xs text-stone-400">
+            {state.answeredCount} of {totalPlayers} {phase === 'write' ? 'written' : 'answered'}
+          </p>
+        </footer>
       </div>
     </main>
   )

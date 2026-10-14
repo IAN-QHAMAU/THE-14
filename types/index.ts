@@ -1,8 +1,11 @@
-import type { Category } from '@/lib/game/questions'
+import type { Category, GameSettings, PublicQuestion, RoundData } from '@/lib/game/questions'
+import type { AnswerPayload, AnswerStat, Award, RevealPayload } from '@/lib/game/scoring'
 
-export type GameStatus = 'waiting' | 'category' | 'active' | 'question_result' | 'finished'
-export type RoundStatus = 'pending' | 'active' | 'locked' | 'revealing' | 'complete'
-export type ActionType = 'answer'
+export type { AnswerPayload, AnswerStat, Award, RevealPayload, PublicQuestion, RoundData }
+
+export type GameStatus = 'waiting' | 'category' | 'active' | 'question_result' | 'leaderboard' | 'finished'
+export type RoundStatus = 'pending' | 'active' | 'voting' | 'locked' | 'revealing' | 'complete'
+export type ActionType = 'answer' | 'bluff'
 
 export interface Game {
   id: string
@@ -10,7 +13,8 @@ export interface Game {
   status: GameStatus
   current_round: number
   max_players: number
-  category: Category | null
+  category: Category | 'mix' | null
+  settings: Partial<GameSettings>
   total_questions: number
   created_at: string
   started_at: string | null
@@ -27,6 +31,8 @@ export interface Player {
   joined_at: string
   last_seen_at: string
   score: number
+  streak: number
+  best_streak: number
   status: string
 }
 
@@ -38,6 +44,7 @@ export interface Round {
   description: string
   question_id: string
   status: RoundStatus
+  data: RoundData
   starts_at: string | null
   ends_at: string | null
   created_at: string
@@ -48,11 +55,7 @@ export interface Action {
   round_id: string
   player_id: string
   action_type: ActionType
-  payload: {
-    option_index: number
-    answered_at: string
-    time_taken_ms: number
-  }
+  payload: AnswerPayload
   created_at: string
 }
 
@@ -67,31 +70,32 @@ export interface GameEvent {
   created_at: string
 }
 
-export interface Score {
-  id: string
-  game_id: string
-  player_id: string
-  round_id: string
-  points: number
-  reason: string
-  created_at: string
-}
-
-export interface AnswerStat {
-  optionIndex: number
-  count: number
-  percentage: number
-}
-
-export interface RevealData {
-  correctIndex: number
-  answerStats: AnswerStat[]
-  questionId: string
-}
-
 export interface PlayerScoreEntry {
   player_id: string
   name: string
   avatar: string
   total: number
+  streak: number
+}
+
+/** Everything /api/game/state returns. */
+export interface GameStateResponse {
+  serverNow: number
+  game: Game
+  players: Player[]
+  myPlayer: Player | null
+  isGameMaster: boolean
+  currentRound: Round | null
+  currentQuestion: PublicQuestion | null
+  myAnswer: AnswerPayload | null
+  myBluff: string | null
+  submissionStatus: Record<string, boolean>
+  answeredCount: number
+  reveal: RevealPayload | null
+  lastReveal: RevealPayload | null
+  scores: PlayerScoreEntry[]
+  myRank: number
+  myScore: number
+  awards: Award[]
+  events: GameEvent[]
 }

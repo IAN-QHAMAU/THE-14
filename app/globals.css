@@ -12,6 +12,10 @@
     box-sizing: inherit;
   }
 
+  html, body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     background-color: #fafaf9;
     color: #1c1917;
@@ -23,9 +27,9 @@
   input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
-    height: 2px;
+    height: 4px;
     background: #d6d3d1;
-    border-radius: 0;
+    border-radius: 9999px;
     outline: none;
   }
 
@@ -49,10 +53,29 @@
 }
 
 @layer utilities {
+  /* Range slider on dark panels. */
+  input[type="range"].range-dark {
+    background: #44403c;
+  }
+  input[type="range"].range-dark::-webkit-slider-thumb {
+    background: #f5f5f4;
+  }
+  input[type="range"].range-dark::-moz-range-thumb {
+    background: #f5f5f4;
+  }
+
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }

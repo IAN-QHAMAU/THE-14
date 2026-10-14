@@ -1,8 +1,8 @@
-
 'use client'
 
 import type { Player, Game } from '@/types'
 import { AvatarDisplay } from '@/components/ui/Avatar'
+import { cn } from '@/lib/utils'
 
 interface Props {
   game: Game
@@ -17,103 +17,55 @@ export function WaitingRoom({ game, players, myPlayer }: Props) {
   const openSpots = Math.max(0, max - count)
 
   return (
-    <main className="min-h-screen bg-stone-50 flex flex-col px-6 py-10">
-      <div className="max-w-sm mx-auto w-full flex flex-col gap-10">
-
-        <header>
-          <h1 className="text-3xl font-light tracking-tight text-stone-900">
-            THE 14
-          </h1>
-          <p className="mt-1 text-xs text-stone-400 tracking-widest uppercase">
-            Waiting room
-          </p>
+    <main className="min-h-[100dvh] bg-stone-50 flex flex-col px-6 py-10">
+      <div className="max-w-md mx-auto w-full flex flex-col gap-10">
+        <header className="flex items-end justify-between">
+          <div>
+            <h1 className="text-3xl font-light tracking-tight text-stone-900">THE 14</h1>
+            <p className="mt-1 text-xs text-stone-400 tracking-widest uppercase">Lobby</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-stone-400">Game code</p>
+            <p className="text-xl font-mono tracking-widest text-stone-700">{game.game_code}</p>
+          </div>
         </header>
+
+        {myPlayer && (
+          <section className="flex items-center gap-4 rounded-2xl bg-white border border-stone-200 p-4 animate-fade-up">
+            <AvatarDisplay avatarId={myPlayer.avatar} size="lg" mood="happy" />
+            <div>
+              <p className="text-lg text-stone-900">{myPlayer.name}</p>
+              <p className="text-sm text-stone-400">You are in. The host will start soon.</p>
+            </div>
+          </section>
+        )}
 
         <section>
           <div className="flex items-baseline justify-between mb-4">
-            <h2 className="text-xs text-stone-400 tracking-widest uppercase">
-              Players
-            </h2>
-            <span className="text-sm font-mono text-stone-600">
+            <h2 className="text-xs text-stone-400 tracking-widest uppercase">Players</h2>
+            <span className="text-sm font-mono text-stone-500">
               {count} / {max}
             </span>
           </div>
 
-          <div
-            className="space-y-px"
-            aria-label={`${count} of ${max} players joined`}
-          >
-            {realPlayers.map((player) => {
-              const isMe = player.id === myPlayer?.id
-
-              return (
-                <div
-                  key={player.id}
-                  className={`flex items-center gap-3 py-3 px-4 border-l-2 ${
-                    isMe
-                      ? 'border-stone-900 bg-stone-100'
-                      : 'border-stone-200 bg-white'
-                  }`}
-                >
-                  <AvatarDisplay avatarId={player.avatar} size="sm" />
-
-                  <span className="text-sm text-stone-800 min-w-0 truncate">
-                    {player.name}
-                    {isMe && (
-                      <span className="ml-2 text-xs text-stone-400">
-                        (you)
-                      </span>
-                    )}
-                  </span>
-
-                  <span
-                    className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      player.is_connected
-                        ? 'bg-stone-900'
-                        : 'bg-stone-300'
-                    }`}
-                    aria-label={
-                      player.is_connected ? 'Connected' : 'Disconnected'
-                    }
-                    title={
-                      player.is_connected ? 'Connected' : 'Disconnected'
-                    }
-                  />
-                </div>
-              )
-            })}
-
+          <div className="grid grid-cols-4 gap-3" aria-label={`${count} of ${max} players joined`}>
+            {realPlayers.map((player, i) => (
+              <div key={player.id} className="flex flex-col items-center gap-1.5 animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
+                <AvatarDisplay
+                  avatarId={player.avatar}
+                  size="md"
+                  className={cn(player.id === myPlayer?.id && 'ring-2 ring-stone-900 ring-offset-2 ring-offset-stone-50', !player.is_connected && 'opacity-40')}
+                />
+                <span className="text-xs text-stone-600 truncate max-w-full">{player.name}</span>
+              </div>
+            ))}
             {Array.from({ length: openSpots }).map((_, index) => (
-              <div
-                key={`open-${index}`}
-                className="flex items-center gap-3 py-3 px-4 border-l-2 border-stone-100 bg-white"
-              >
-                <span className="w-8 h-8 flex items-center justify-center text-xs text-stone-300 border border-stone-100">
-                  {count + index + 1}
-                </span>
-
-                <span className="text-sm text-stone-300">
-                  Open spot
-                </span>
+              <div key={`open-${index}`} className="flex flex-col items-center gap-1.5">
+                <span className="w-12 h-12 rounded-full border border-dashed border-stone-200" />
+                <span className="text-xs text-stone-300">Open</span>
               </div>
             ))}
           </div>
-        </section>
-
-        <p className="text-sm text-stone-400">
-          {count < 2
-            ? 'Waiting for players.'
-            : openSpots > 0
-              ? `${openSpots} ${openSpots === 1 ? 'spot' : 'spots'} open.`
-              : 'Room full.'}
-        </p>
-
-        <section className="border-t border-stone-200 pt-6">
-          <p className="text-xs text-stone-400">Game code</p>
-
-          <p className="text-2xl font-mono tracking-widest text-stone-700 mt-1">
-            {game.game_code}
-          </p>
         </section>
       </div>
     </main>

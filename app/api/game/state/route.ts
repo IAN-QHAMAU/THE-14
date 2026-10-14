@@ -4,14 +4,18 @@ import {
   getGameById,
   getPlayers,
   getCurrentRound,
-  hasPlayerAnswered,
-  getPlayerAnswer,
-  getPlayerScores,
+  getMyActions,
+  getRoundActions,
+  getRevealForRound,
+  getLatestReveal,
+  getAwards,
   getGameEvents,
-  getRevealData,
-  getSubmissionStatus,
+  toScoreEntries,
 } from '@/lib/db/queries'
-import { QUESTIONS } from '@/lib/game/questions'
+import { getQuestionById, toPublicQuestion } from '@/lib/game/questions'
+import type { GameStateResponse, Player } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const session = await getSession()
@@ -30,87 +34,69 @@ export async function GET() {
   if (!game) return NextResponse.json({ error: 'Game not found.' }, { status: 404 })
 
   const myPlayer = players.find((p) => p.id === playerId) ?? null
+  const realPlayers = players.filter((p) => !p.is_game_master)
 
-  // Strip sensitive fields from players list
   const safePlayers = players.map((p) => ({
     id: p.id,
+    game_id: p.game_id,
     name: p.name,
     avatar: p.avatar ?? 'ninja',
     is_game_master: p.is_game_master,
     is_connected: p.is_connected,
     score: p.score,
+    streak: p.streak ?? 0,
+    best_streak: p.best_streak ?? 0,
     status: p.status,
-  }))
+    joined_at: p.joined_at,
+    last_seen_at: p.last_seen_at,
+  })) as Player[]
 
-  // Player's answer for current round
-  const submitted = round && !isGameMaster
-    ? await hasPlayerAnswered(round.id, playerId)
-    : false
+  // Current question, without the answer.
+  const question = round ? getQuestionById(round.question_id) : undefined
+  const currentQuestion = question ? toPublicQuestion(question, round?.data) : null
 
-  const selectedOption = round && !isGameMaster && submitted
-    ? await getPlayerAnswer(round.id, playerId)
-    : null
-
-  // GM submission tracking
+  // Who has submitted for the current phase.
   let submissionStatus: Record<string, boolean> = {}
-  if (isGameMaster && round) {
-    const realPlayers = players.filter((p) => !p.is_game_master)
-    submissionStatus = await getSubmissionStatus(round.id, realPlayers.map((p) => p.id))
+  let answeredCount = 0
+  if (round && ['active', 'voting'].includes(round.status)) {
+    const actions = await getRoundActions(round.id)
+    const phaseType = round.data?.phase === 'write' ? 'bluff' : 'answer'
+    const done = new Set(actions.filter((a) => a.action_type === phaseType).map((a) => a.player_id))
+    submissionStatus = Object.fromEntries(realPlayers.map((p) => [p.id, done.has(p.id)]))
+    answeredCount = done.size
   }
 
-  // Current question (safe to send — no answer revealed until reveal phase)
-  let currentQuestion = null
-  if (round?.question_id) {
-    const allQuestions = Object.values(QUESTIONS).flat()
-    const q = allQuestions.find((q) => q.id === round.question_id)
-    if (q) {
-      // Never send the correct answer index until revealing
-      const isRevealing = round.status === 'revealing' || game.status === 'question_result'
-      currentQuestion = {
-        id: q.id,
-        category: q.category,
-        question: q.question,
-        options: q.options,
-        points: q.points,
-        speedBonus: q.speedBonus,
-        // Only send correct answer during reveal
-        correct: isRevealing ? q.correct : -1,
-      }
-    }
-  }
+  const mine = round && !isGameMaster ? await getMyActions(round.id, playerId) : { answer: null, bluff: null }
 
-  // Reveal data (answer stats from event log)
-  let revealData = null
-  if (round && (round.status === 'revealing') && round.id) {
-    revealData = await getRevealData(round.id)
-  }
+  const reveal = round && game.status === 'question_result' ? await getRevealForRound(round.id) : null
+  const lastReveal = game.status === 'leaderboard' || game.status === 'finished' ? await getLatestReveal(gameId) : null
+  const awards = game.status === 'finished' ? await getAwards(gameId) : []
 
-  // Scores
-  const scores = ['question_result', 'finished', 'category'].includes(game.status)
-    ? await getPlayerScores(gameId)
-    : []
+  const scores = toScoreEntries(players)
+  const myScore = myPlayer?.score ?? 0
+  const myRank = isGameMaster ? 0 : scores.filter((s) => s.total > myScore).length + 1
 
-  // My rank
-  const sortedScores = [...scores].sort((a, b) => b.total - a.total)
-  const myRank = sortedScores.findIndex((s) => s.player_id === playerId) + 1
-  const myScore = scores.find((s) => s.player_id === playerId)?.total ?? 0
+  const events = isGameMaster ? await getGameEvents(gameId, 20) : []
 
-  const events = await getGameEvents(gameId, 20)
-
-  return NextResponse.json({
+  const response: GameStateResponse = {
+    serverNow: Date.now(),
     game,
     players: safePlayers,
     myPlayer,
+    isGameMaster,
     currentRound: round,
     currentQuestion,
-    submitted,
-    selectedOption,
+    myAnswer: mine.answer,
+    myBluff: mine.bluff?.text ?? null,
     submissionStatus,
-    revealData,
+    answeredCount,
+    reveal,
+    lastReveal,
     scores,
     myRank,
     myScore,
+    awards,
     events,
-    isGameMaster,
-  })
+  }
+  return NextResponse.json(response, { headers: { 'Cache-Control': 'no-store' } })
 }
