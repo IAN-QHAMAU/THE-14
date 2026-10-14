@@ -86,15 +86,15 @@ Party rounds are capped at about one in six questions and never open the game.
 
 ## Categories
 
-511 questions across 26 categories.
+651 questions across 34 categories.
 
 | Group | Categories (questions) |
 |---|---|
-| **Brain** | 🧠 General Knowledge (22), 🔬 Science (20), 🏛️ History (20), 🗺️ Flags & Places (32), 🪐 Space (17), 🧩 Riddles & Numbers (15), ⚡ Wild Facts (13) |
-| **Pop Culture** | ⛩️ Anime (23), 🎬 Movies & TV (30), 🎵 Music (18), 🎮 Gaming (19), 📱 Internet Culture (14), 🦸 Superheroes (16), 📺 Cartoons (15) |
+| **Brain** | 🧠 General Knowledge (22), 🔬 Science (20), 🏛️ History (20), 🗺️ Flags & Places (32), 🪐 Space (17), 🧩 Riddles & Numbers (15), ⚡ Wild Facts (13), 💻 Tech (23), 🔤 Words & Language (16), ⚱️ Mythology (16), 🫀 Human Body (19) |
+| **Pop Culture** | ⛩️ Anime (23), 🎬 Movies & TV (30), 🎵 Music (18), 🎮 Gaming (19), 📱 Internet Culture (14), 🦸 Superheroes (16), 📺 Cartoons (15), 📚 Books & Literature (17), 🥁 African Music (16) |
 | **Sports** | 🏅 Sports Mix (15), ⚽ Football (19), 🏀 Basketball (14), 🏎️ Motorsport (13), 🏃 Athletics & Olympics (15), 🎾 Tennis, Rugby & Cricket (13) |
 | **Kenya & Africa** | 🇰🇪 Kenya (19), 🌍 Africa (25) |
-| **Lifestyle** | 🍕 Food & Drinks (17), 🚗 Cars (16), 🐘 Animals (19), 🏷️ Brands & Logos (16) |
+| **Lifestyle** | 🍕 Food & Drinks (17), 🚗 Cars (16), 🐘 Animals (19), 🏷️ Brands & Logos (16), 💰 Money & Business (17), 👗 Fashion (16) |
 
 Plus 20 Most Likely To prompts and 16 Bluff prompts that work with any category.
 
@@ -188,7 +188,7 @@ WAITING → CATEGORY (intro) → ACTIVE → QUESTION_RESULT → (LEADERBOARD) �
 
 Questions live in `lib/game/questions/`:
 
-- `classic.ts` and `more.ts` hold multiple choice questions
+- `classic.ts`, `more.ts` and `extra.ts` hold multiple choice questions (`extra.ts` also has a few special types for the newer categories)
 - `special.ts` holds True or False, Emoji, Picture, Closest, Order, Most Likely To and Bluff
 
 A classic question looks like this:
