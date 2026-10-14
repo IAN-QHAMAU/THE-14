@@ -109,6 +109,23 @@ export function AvatarDisplay({
   )
 }
 
+/** Data URI for an avatar, or null for legacy emoji avatars. Used by the share card. */
+export async function getAvatarDataUri(avatarId: string): Promise<string | null> {
+  const parsed = parseAvatar(avatarId)
+  if (!parsed) return null
+  const key = `${parsed.style}:${parsed.seed}:${parsed.bg}`
+  const hit = cache.get(key)
+  if (hit) return hit
+  const render = await loadRenderer(parsed.style)
+  const out = render(parsed.seed, parsed.bg)
+  cache.set(key, out)
+  return out
+}
+
+export function legacyEmoji(avatarId: string) {
+  return LEGACY_AVATARS[avatarId] ?? '👤'
+}
+
 export function defaultAvatar() {
   return makeAvatarId('adventurer', randomSeed(), AVATAR_BACKGROUNDS[Math.floor(Math.random() * AVATAR_BACKGROUNDS.length)])
 }
