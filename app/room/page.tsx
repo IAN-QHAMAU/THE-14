@@ -83,17 +83,11 @@ export default function RoomPage() {
     return (
       <Dark>
         <ReactionLayer items={items} />
-        <Podium scores={state.scores} awards={state.awards} myPlayerId={myPlayer?.id}>
+        <Podium scores={state.scores} awards={state.awards} tags={state.tags} myPlayerId={myPlayer?.id}>
           <div className="space-y-6">
             <ReactionBar onSend={send} dark />
             {meEntry && (
-              <ShareCard
-                me={meEntry}
-                rank={state.myRank}
-                totalPlayers={state.scores.length}
-                scores={state.scores}
-                awards={state.awards}
-              />
+              <ShareCard mode="player" me={meEntry} scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
             )}
           </div>
         </Podium>

@@ -8,7 +8,7 @@ import {
   getRoundActions,
   getRevealForRound,
   getLatestReveal,
-  getAwards,
+  getGameEnd,
   getGameEvents,
   toScoreEntries,
 } from '@/lib/db/queries'
@@ -70,7 +70,7 @@ export async function GET() {
 
   const reveal = round && game.status === 'question_result' ? await getRevealForRound(round.id) : null
   const lastReveal = game.status === 'leaderboard' || game.status === 'finished' ? await getLatestReveal(gameId) : null
-  const awards = game.status === 'finished' ? await getAwards(gameId) : []
+  const end = game.status === 'finished' ? await getGameEnd(gameId) : { awards: [], stats: {}, tags: {} }
 
   const scores = toScoreEntries(players)
   const myScore = myPlayer?.score ?? 0
@@ -95,7 +95,9 @@ export async function GET() {
     scores,
     myRank,
     myScore,
-    awards,
+    awards: end.awards,
+    stats: end.stats,
+    tags: end.tags,
     events,
   }
   return NextResponse.json(response, { headers: { 'Cache-Control': 'no-store' } })

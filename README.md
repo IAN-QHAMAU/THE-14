@@ -117,6 +117,13 @@ Answer time is measured on the server from the moment the question opens, so it 
 
 At the end, awards go to the sharpest mind, the fastest finger, the hottest streak, the biggest comeback, the boldest guesser and the best bluffer.
 
+Every player also gets a tag, so nobody leaves empty handed. Award winners keep their award, and everyone else gets one from how they played: Champion, Brainbox, Quick draw, On fire, Climber, Sneaky, Trigger happy, Steady, Here for the vibes, Warming up and more.
+
+### Result cards
+
+- **Players** can share or save a 1080 x 1920 card (status and story size) with their placing, tag, stats (answers right, best streak, average speed) and the top 5. If they finished outside the top 5, their own row is added at the bottom.
+- **The GM** gets a group card on the podium screen with the top 3 and every player with their tag, ready to post in the group chat.
+
 ---
 
 ## Project Structure

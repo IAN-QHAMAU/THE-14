@@ -1,5 +1,5 @@
 import { createServerSupabase } from './supabase'
-import type { Game, Player, Round, GameEvent, PlayerScoreEntry, ActionType, AnswerPayload, RevealPayload, Award } from '@/types'
+import type { Game, Player, Round, GameEvent, PlayerScoreEntry, ActionType, AnswerPayload, RevealPayload, Award, PlayerStats, PlayerTag } from '@/types'
 
 export async function getGameByCode(code: string): Promise<Game | null> {
   const db = createServerSupabase()
@@ -101,7 +101,11 @@ export async function getLatestReveal(gameId: string): Promise<RevealPayload | n
   return (data?.payload as RevealPayload | undefined) ?? null
 }
 
-export async function getAwards(gameId: string): Promise<Award[]> {
+export async function getGameEnd(gameId: string): Promise<{
+  awards: Award[]
+  stats: Record<string, PlayerStats>
+  tags: Record<string, PlayerTag>
+}> {
   const db = createServerSupabase()
   const { data } = await db
     .from('events')
@@ -111,7 +115,8 @@ export async function getAwards(gameId: string): Promise<Award[]> {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  return ((data?.payload as { awards?: Award[] } | undefined)?.awards) ?? []
+  const p = (data?.payload ?? {}) as { awards?: Award[]; stats?: Record<string, PlayerStats>; tags?: Record<string, PlayerTag> }
+  return { awards: p.awards ?? [], stats: p.stats ?? {}, tags: p.tags ?? {} }
 }
 
 export function toScoreEntries(players: Player[]): PlayerScoreEntry[] {

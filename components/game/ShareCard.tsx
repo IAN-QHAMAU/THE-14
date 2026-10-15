@@ -7,11 +7,11 @@ import { renderShareCard, shareCardImage, type ShareCardInput } from '@/lib/shar
  * Builds the result card as soon as the podium is shown, so tapping Share
  * opens the share sheet straight away (iPhones require that).
  */
-export function ShareCard(props: ShareCardInput) {
+export function ShareCard(props: ShareCardInput & { dark?: boolean }) {
   const [blob, setBlob] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const key = `${props.me.player_id}:${props.me.total}:${props.rank}:${props.awards.length}`
+  const key = `${props.mode}:${props.me?.player_id ?? 'all'}:${props.scores.map((x) => x.total).join(',')}:${Object.keys(props.tags).length}`
 
   useEffect(() => {
     let alive = true
@@ -36,21 +36,21 @@ export function ShareCard(props: ShareCardInput) {
     if (save) {
       const a = document.createElement('a')
       a.href = preview!
-      a.download = 'the14-result.png'
+      a.download = props.mode === 'group' ? 'the14-results.png' : 'the14-result.png'
       a.click()
       setNote('Saved.')
       return
     }
-    const r = await shareCardImage(blob)
+    const r = await shareCardImage(blob, props.mode === 'group' ? 'the14-results.png' : 'the14-result.png')
     if (r === 'saved') setNote('Saved to your downloads.')
   }
 
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl overflow-hidden bg-stone-800 aspect-[4/5] w-40 mx-auto">
+      <div className="rounded-2xl overflow-hidden bg-stone-800 aspect-[9/16] w-36 mx-auto">
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="Your result card" className="w-full h-full object-cover" />
+          <img src={preview} alt={props.mode === 'group' ? 'Group results card' : 'Your result card'} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full animate-pulse" />
         )}
