@@ -10,6 +10,7 @@ import { Podium } from '@/components/game/Podium'
 import { ShareCard } from '@/components/game/ShareCard'
 import { PromptExtras } from '@/components/game/answers'
 import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
+import { useState } from 'react'
 import { useServerNow } from '@/lib/clock'
 import { cn } from '@/lib/utils'
 import type { GameStateResponse } from '@/types'
@@ -30,13 +31,17 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
             Join at <span className="text-stone-200">{joinUrl}</span> with code
           </p>
           <p className="font-mono text-6xl md:text-8xl tracking-[0.2em] text-stone-50">{game.game_code}</p>
+          <InviteLink code={game.game_code} />
         </div>
         <div className="flex flex-wrap justify-center gap-4 max-w-2xl mx-auto min-h-[5rem]">
           {players.length === 0 && <p className="text-stone-500">Waiting for players.</p>}
           {players.map((p, i) => (
             <div key={p.id} className="flex flex-col items-center gap-1.5 w-20 animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
-              <AvatarDisplay avatarId={p.avatar} size="lg" mood="happy" />
-              <span className="text-sm text-stone-300 truncate max-w-full">{p.name}</span>
+              <AvatarDisplay avatarId={p.avatar} size="lg" mood={p.is_connected ? 'happy' : null} className={cn(!p.is_connected && 'opacity-40')} />
+              <span className={cn('text-sm truncate max-w-full', p.is_connected ? 'text-stone-300' : 'text-stone-500')}>
+                {p.name}
+                {!p.is_connected && <span className="block text-[11px] text-stone-600">away</span>}
+              </span>
             </div>
           ))}
         </div>
@@ -185,6 +190,50 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
           {state.answeredCount} of {players.length} {isWrite ? 'written' : 'answered'}
         </span>
       </div>
+    </div>
+  )
+}
+
+/** Join link with the code already filled in, ready to paste in the group chat. */
+function InviteLink({ code }: { code: string }) {
+  const [note, setNote] = useState('')
+  const text = `Join my THE 14 game. Code ${code}`
+
+  const link = () => `${window.location.origin}/join?code=${code}`
+
+  async function copy() {
+    try {
+      const url = link()
+      await navigator.clipboard.writeText(url)
+      setNote('Link copied')
+    } catch {
+      setNote('Could not copy')
+    }
+  }
+
+  async function share() {
+    const url = link()
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'THE 14', text, url })
+        return
+      }
+      await navigator.clipboard.writeText(`${text}: ${url}`)
+      setNote('Invite copied')
+    } catch {
+      // Share sheet closed, nothing to do.
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+      <button type="button" onClick={copy} className="rounded-full border border-stone-700 px-4 py-1.5 text-sm text-stone-300 hover:bg-stone-800">
+        Copy link
+      </button>
+      <button type="button" onClick={share} className="rounded-full bg-stone-100 px-4 py-1.5 text-sm text-stone-900 hover:bg-stone-200">
+        Share invite
+      </button>
+      {note && <span className="text-xs text-stone-500 w-full">{note}</span>}
     </div>
   )
 }

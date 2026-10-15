@@ -10,6 +10,7 @@ import {
   type RoundData,
 } from '@/lib/game/questions'
 import { buildBluffOptions, computeAwards, computePlayerStats, computeRanks, computeTags, gradeRound } from '@/lib/game/scoring'
+import { isActive } from '@/lib/presence'
 import type { Game, GameStatus, Player, Round, RoundStatus } from '@/types'
 
 const db = () => createServerSupabase()
@@ -115,9 +116,10 @@ export async function startNextQuestion(game: Game, players: Player[]): Promise<
     data.perm = perm
   }
   if (question.type === 'mostlikely') {
-    data.players = players
-      .filter((p) => !p.is_game_master)
-      .map((p) => ({ id: p.id, name: p.name, avatar: p.avatar }))
+    // Only players still in the room are up for the vote.
+    const everyone = players.filter((p) => !p.is_game_master)
+    const here = everyone.filter((p) => isActive(p.last_seen_at))
+    data.players = (here.length ? here : everyone).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar }))
   }
   if (question.type === 'bluff') data.phase = 'write'
 

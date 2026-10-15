@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
+import { createServerSupabase } from '@/lib/db/supabase'
 import { getGameById, getCurrentRound, getPlayers } from '@/lib/db/queries'
 import {
   setupGame,
@@ -10,6 +11,7 @@ import {
   hasPendingRounds,
   finishGame,
   resetGame,
+  logEvent,
 } from '@/lib/game/stateMachine'
 import {
   ALL_TYPES,
@@ -114,6 +116,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Nothing to end.' }, { status: 400 })
       }
       await finishGame(gameId)
+      return NextResponse.json({ success: true })
+    }
+
+    case 'remove_player': {
+      const playerId = String(body.playerId ?? '')
+      const db = createServerSupabase()
+      const { data: removed } = await db
+        .from('players')
+        .delete()
+        .eq('id', playerId)
+        .eq('game_id', gameId)
+        .eq('is_game_master', false)
+        .select('id')
+      if (!removed?.length) return NextResponse.json({ error: 'Player not found.' }, { status: 404 })
+      await logEvent(gameId, null, 'player_removed', {})
       return NextResponse.json({ success: true })
     }
 

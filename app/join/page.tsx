@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AvatarPicker, defaultAvatar } from '@/components/ui/Avatar'
 import { InstallApp } from '@/components/InstallApp'
+import { isValidAvatar } from '@/lib/avatar'
+
+const PROFILE_KEY = 'the14_player'
 
 export default function JoinPage() {
   const router = useRouter()
@@ -14,8 +17,20 @@ export default function JoinPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Random look on first load. Done after mount so server and client agree.
-  useEffect(() => setAvatar(defaultAvatar()), [])
+  // Fill in from the invite link and from this phone's last game. Done after
+  // mount so server and client agree.
+  useEffect(() => {
+    const fromLink = new URLSearchParams(window.location.search).get('code')
+    if (fromLink) setCode(fromLink.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5))
+    let saved: { name?: string; avatar?: string } = {}
+    try {
+      saved = JSON.parse(window.localStorage.getItem(PROFILE_KEY) ?? '{}')
+    } catch {
+      saved = {}
+    }
+    if (saved.name) setName(saved.name)
+    setAvatar(saved.avatar && isValidAvatar(saved.avatar) ? saved.avatar : defaultAvatar())
+  }, [])
 
   async function handleJoin() {
     setError('')
@@ -32,6 +47,11 @@ export default function JoinPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Could not join.'); return }
+      try {
+        window.localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: name.trim(), avatar }))
+      } catch {
+        // Storage blocked, they will just type it again next time.
+      }
       router.push('/room')
     } catch {
       setError('Connection error.')

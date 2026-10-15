@@ -132,6 +132,31 @@ export default function GMControlPage() {
     [refresh],
   )
 
+  // A brand new game with a new code. The old one is wrapped up on the server.
+  const newGame = useCallback(async () => {
+    const status = state?.game.status
+    const inProgress = status && !['waiting', 'finished'].includes(status)
+    const ask = inProgress
+      ? 'End this game and start a new one with a new code?'
+      : status === 'waiting'
+        ? 'Close this lobby and start a new game with a new code?'
+        : null
+    if (ask && !window.confirm(ask)) return
+    sound.unlock()
+    setLoading('new_game')
+    setError('')
+    try {
+      const res = await fetch('/api/game/create', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) setError(data.error ?? 'Could not create game.')
+      await refresh()
+    } catch {
+      setError('Connection error.')
+    } finally {
+      setLoading(null)
+    }
+  }, [state?.game.status, refresh])
+
   if (state && !state.isGameMaster) router.push('/room')
 
   const round = state?.currentRound
@@ -147,7 +172,9 @@ export default function GMControlPage() {
     if (!['active', 'voting'].includes(round.status)) return
     const key = `${round.id}:${round.status}:${phase ?? ''}`
     if (autoFired.current === key) return
-    const allIn = realPlayers.length > 0 && state.answeredCount >= realPlayers.length
+    // Players who have gone away do not hold up the reveal.
+    const here = realPlayers.filter((p) => p.is_connected).length || realPlayers.length
+    const allIn = here > 0 && state.answeredCount >= here
     const started = round.starts_at ? serverNow() >= Date.parse(round.starts_at) : true
     const delay = allIn && started ? 1200 : Math.max(0, Date.parse(round.ends_at) - serverNow() + 800)
     const action = phase === 'write' ? 'start_voting' : 'lock_question'
@@ -229,7 +256,8 @@ export default function GMControlPage() {
       primary = { label: isLast ? 'Final results' : 'Next question', action: 'next_question' }
       break
     case 'finished':
-      primary = { label: 'Play again', action: 'play_again' }
+      primary = { label: 'New game', action: 'new_game' }
+      secondary = { label: 'Play again', action: 'play_again' }
       break
   }
 
@@ -247,17 +275,28 @@ export default function GMControlPage() {
           .map((p) => {
             const answered = state.submissionStatus[p.id]
             return (
-              <div key={p.id} className="flex items-center gap-2.5 py-2 px-2.5 rounded-xl bg-stone-800/60">
+              <div key={p.id} className={cn('group flex items-center gap-2.5 py-2 px-2.5 rounded-xl bg-stone-800/60', !p.is_connected && 'opacity-60')}>
                 <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', p.is_connected ? 'bg-emerald-500' : 'bg-stone-600')} />
                 <AvatarDisplay avatarId={p.avatar} size="xs" />
                 <span className="text-sm text-stone-200 flex-1 truncate">
                   {p.name}
+                  {!p.is_connected && <span className="ml-1.5 text-xs text-stone-500">away</span>}
                   {p.streak >= 3 && <span className="ml-1.5 text-xs text-stone-400">🔥{p.streak}</span>}
                 </span>
                 {game.status === 'active' && (
                   <span className={cn('text-xs', answered ? 'text-emerald-400' : 'text-stone-600')}>{answered ? '✓' : '…'}</span>
                 )}
                 <span className="text-xs font-mono text-stone-400 w-12 text-right">{p.score}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Remove ${p.name} from the game?`)) void control('remove_player', { playerId: p.id })
+                  }}
+                  aria-label={`Remove ${p.name}`}
+                  className="text-stone-600 hover:text-rose-400 px-1 text-base leading-none"
+                >
+                  ×
+                </button>
               </div>
             )
           })}
@@ -278,6 +317,16 @@ export default function GMControlPage() {
         </div>
         <div className="flex items-center gap-3">
           {game.status !== 'waiting' && <span className="font-mono text-sm tracking-widest text-stone-400">{game.game_code}</span>}
+          {game.status !== 'finished' && (
+            <button
+              type="button"
+              onClick={() => void newGame()}
+              disabled={loading === 'new_game'}
+              className="text-xs text-stone-400 rounded-full border border-stone-700 px-3 py-1 hover:text-stone-200 hover:border-stone-500 disabled:opacity-50"
+            >
+              New game
+            </button>
+          )}
           <SoundToggle dark />
           <button
             type="button"
@@ -289,14 +338,14 @@ export default function GMControlPage() {
         </div>
       </header>
 
-      <div className="flex-1 grid lg:grid-cols-[1fr_340px]">
+      <div className="flex-1 grid lg:grid-cols-[1fr_360px] lg:items-start">
         {/* Stage */}
-        <section className="px-4 md:px-10 py-8 md:py-12 flex flex-col items-center justify-center min-h-[50vh]">
+        <section className="px-4 md:px-10 py-8 md:py-12 flex flex-col items-center justify-center min-h-[50vh] lg:sticky lg:top-0 lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto">
           <HostStage state={state} joinUrl={joinUrl} />
         </section>
 
         {/* Side panel */}
-        <aside className={cn('border-t lg:border-t-0 lg:border-l border-stone-800 px-4 py-6 space-y-8 lg:block', panelOpen || game.status === 'waiting' ? 'block' : 'hidden')}>
+        <aside className={cn('border-t lg:border-t-0 lg:border-l border-stone-800 px-4 py-6 space-y-8 lg:block lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto', panelOpen || game.status === 'waiting' ? 'block' : 'hidden')}>
           {game.status === 'waiting' ? (
             <>
               <GameSetup settings={settings} onChange={updateSettings} />
@@ -352,7 +401,12 @@ export default function GMControlPage() {
               variant="secondary"
               className="bg-transparent border-stone-700 text-stone-200 hover:bg-stone-800"
               loading={loading === secondary.action}
-              onClick={() => void control(secondary!.action)}
+              onClick={() => {
+                if (secondary!.action === 'play_again') {
+                  if (!window.confirm('Play again with the same players and code?')) return
+                }
+                void control(secondary!.action)
+              }}
             >
               {secondary.label}
             </Button>
@@ -363,7 +417,7 @@ export default function GMControlPage() {
               loading={loading === primary.action}
               disabled={primary.disabled}
               onClick={() => {
-                if (primary!.action === 'play_again' && !window.confirm('Start a new game with the same players?')) return
+                if (primary!.action === 'new_game') return void newGame()
                 void control(primary!.action, primary!.extra)
               }}
             >

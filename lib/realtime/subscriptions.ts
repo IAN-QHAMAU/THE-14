@@ -10,10 +10,13 @@ export function subscribeToGame(gameId: string, onChange: () => void) {
     .subscribe()
 }
 
+// New players only. Updates are mostly presence check-ins, which would make
+// every phone refetch constantly; score changes, rejoins and removals are
+// announced through the events table instead.
 export function subscribeToPlayers(gameId: string, onChange: () => void) {
   return supabase
     .channel(`players:${gameId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` }, onChange)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` }, onChange)
     .subscribe()
 }
 

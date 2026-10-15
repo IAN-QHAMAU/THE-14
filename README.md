@@ -54,7 +54,11 @@ Open [http://localhost:3000](http://localhost:3000)
 4. Hit **Start game**, then **Start question 1**
 5. With **Auto play** on (the default), the game runs itself: the answer is revealed when everyone has answered or the timer runs out, the reveal stays up for 6 seconds (9 for Bluff, Closest and Most Likely), standings show for 5 seconds every 3 questions and before the final results, then the next question starts. A "Next in" countdown shows in the control bar and you can tap the button to skip ahead.
 6. Turn Auto play off to drive it yourself. **Auto reveal** can stay on alone, and after each reveal you choose **Standings** or **Next question**.
-7. The podium and awards drop after the last question. **Play again** keeps the same players.
+7. The podium and awards drop after the last question. **Play again** keeps the same code and players, and **New game** starts fresh with a new code.
+
+**Starting a fresh game:** tap **New game** in the top bar of the GM screen at any time, or open `/gm` and choose **Start a new game** (it also offers **Continue** if you already have a game open). The old game is wrapped up automatically: players mid-game see the podium, and players still in the lobby are told the host started a new game. The lobby shows **Copy link** and **Share invite** buttons with a join link that fills in the code, and the join page remembers each player's name and avatar.
+
+**No duplicate players:** joining again from the same phone gives you your own seat back. Joining with the name of a player who has gone quiet takes that seat back with its score, which also lets people rejoin a game in progress. If that name belongs to someone still active, the joiner is asked to add an initial. Phones check in quietly in the background; players who stop checking in show as faded "away", do not hold up auto reveal and are left out of Most Likely To. The host can remove anyone with the × in the players list.
 
 ### Players
 1. Go to `/join` on their phone

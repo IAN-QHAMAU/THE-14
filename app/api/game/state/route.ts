@@ -13,6 +13,8 @@ import {
   toScoreEntries,
 } from '@/lib/db/queries'
 import { getQuestionById, toPublicQuestion } from '@/lib/game/questions'
+import { createServerSupabase } from '@/lib/db/supabase'
+import { HEARTBEAT_MS, isActive } from '@/lib/presence'
 import type { GameStateResponse, Player } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -38,13 +40,28 @@ export async function GET() {
   const myPlayer = players.find((p) => p.id === playerId) ?? null
   const realPlayers = players.filter((p) => !p.is_game_master)
 
+  // The host removed this player: send them back to the join page.
+  if (!isGameMaster && !myPlayer) {
+    return NextResponse.json({ error: 'You are no longer in this game.' }, { status: 401 })
+  }
+
+  // Presence check-in, throttled so it does not write on every fetch.
+  const nowMs = Date.now()
+  if (myPlayer && (!myPlayer.last_seen_at || nowMs - Date.parse(myPlayer.last_seen_at) > HEARTBEAT_MS)) {
+    myPlayer.last_seen_at = new Date(nowMs).toISOString()
+    await createServerSupabase()
+      .from('players')
+      .update({ last_seen_at: myPlayer.last_seen_at, is_connected: true })
+      .eq('id', myPlayer.id)
+  }
+
   const safePlayers = players.map((p) => ({
     id: p.id,
     game_id: p.game_id,
     name: p.name,
     avatar: p.avatar ?? 'ninja',
     is_game_master: p.is_game_master,
-    is_connected: p.is_connected,
+    is_connected: p.is_game_master || isActive(p.last_seen_at, nowMs),
     score: p.score,
     streak: p.streak ?? 0,
     best_streak: p.best_streak ?? 0,
