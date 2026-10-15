@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AvatarPicker, defaultAvatar } from '@/components/ui/Avatar'
+import { InstallApp } from '@/components/InstallApp'
 
 export default function JoinPage() {
   const router = useRouter()
@@ -75,6 +76,8 @@ export default function JoinPage() {
             JOIN GAME
           </Button>
         </div>
+
+        <InstallApp />
 
         <div className="border-t border-stone-100 pt-5">
           <p className="text-xs text-stone-400 text-center mb-2">Running the game?</p>
