@@ -18,6 +18,8 @@ import type { GameStateResponse, Player } from '@/types'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  // Taken first, for clock sync: when the server received the request.
+  const serverStart = Date.now()
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 })
@@ -79,6 +81,7 @@ export async function GET() {
   const events = isGameMaster ? await getGameEvents(gameId, 20) : []
 
   const response: GameStateResponse = {
+    serverStart,
     serverNow: Date.now(),
     game,
     players: safePlayers,

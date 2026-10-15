@@ -122,7 +122,10 @@ export default function RoomPage() {
   }
 
   if (game.status === 'active' && state.currentRound && state.currentQuestion) {
-    return <QuestionScreen state={state} onSubmit={handleSubmit} />
+    // A fresh screen for every question and every Bluff phase, so nothing
+    // from the previous one (like a selected answer) can carry over.
+    const phaseKey = `${state.currentRound.id}:${state.currentRound.data?.phase ?? 'answer'}`
+    return <QuestionScreen key={phaseKey} state={state} onSubmit={handleSubmit} />
   }
 
   if (game.status === 'category') {

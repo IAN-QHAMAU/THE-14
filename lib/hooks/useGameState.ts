@@ -35,7 +35,7 @@ export function useGameState(opts: { onUnauthorized: () => void; watchActions?: 
         return
       }
       const data = (await res.json()) as GameStateResponse
-      syncClock(data.serverNow, started)
+      syncClock(data.serverStart ?? data.serverNow, data.serverNow, started)
       setError('')
       setState(data)
     } catch {
