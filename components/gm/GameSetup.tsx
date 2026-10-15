@@ -106,7 +106,7 @@ export function GameSetup({ settings, onChange }: Props) {
           })}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {groupCats.map((c) => {
             const info = CATEGORIES[c]
             const active = settings.categories.includes(c)
@@ -139,7 +139,7 @@ export function GameSetup({ settings, onChange }: Props) {
       {/* Game types */}
       <section className="space-y-3">
         <h2 className="text-xs uppercase tracking-widest text-stone-400">Game types</h2>
-        <div className="grid sm:grid-cols-2 gap-2">
+        <div className="grid gap-2">
           {ALL_TYPES.map((t) => {
             const info = GAME_TYPES[t]
             const active = settings.types.includes(t)
@@ -167,7 +167,7 @@ export function GameSetup({ settings, onChange }: Props) {
       </section>
 
       {/* Length and timer */}
-      <section className="grid sm:grid-cols-2 gap-6">
+      <section className="grid gap-6">
         <div className="space-y-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-xs uppercase tracking-widest text-stone-400">Questions</h2>

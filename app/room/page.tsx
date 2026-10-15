@@ -78,6 +78,25 @@ export default function RoomPage() {
     return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} />
   }
 
+  // The host closed this lobby before it started (usually for a new game).
+  if (game.status === 'finished' && game.total_questions === 0) {
+    return (
+      <Dark>
+        <div className="text-center space-y-4 animate-fade-up">
+          <h1 className="text-2xl font-light">The host started a new game</h1>
+          <p className="text-sm text-stone-400">Ask the host for the new code, or open their invite link.</p>
+          <button
+            type="button"
+            onClick={toJoin}
+            className="mt-2 rounded-xl bg-stone-50 text-stone-900 px-6 py-3 text-sm font-medium"
+          >
+            Join a game
+          </button>
+        </div>
+      </Dark>
+    )
+  }
+
   if (game.status === 'finished') {
     const meEntry = state.scores.find((s) => s.player_id === myPlayer?.id)
     return (
@@ -89,6 +108,9 @@ export default function RoomPage() {
             {meEntry && (
               <ShareCard mode="player" me={meEntry} scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
             )}
+            <button type="button" onClick={toJoin} className="w-full text-xs text-stone-500 underline underline-offset-4 hover:text-stone-300">
+              Join another game
+            </button>
           </div>
         </Podium>
       </Dark>
