@@ -52,8 +52,8 @@ Open [http://localhost:3000](http://localhost:3000)
 2. Put the GM screen on a TV or laptop if you can. It turns into a big host screen with the join code, questions, reveals, standings and the podium. On a phone it works as a control panel.
 3. Pick categories (grouped into Brain, Pop Culture, Sports, Kenya & Africa, Lifestyle), game types, number of questions and time per question
 4. Hit **Start game**, then **Start question 1**
-5. With **Auto reveal** on, the answer is revealed when everyone has answered or the timer runs out. You can also reveal by hand.
-6. After each reveal choose **Standings** to show the leaderboard, or go straight to **Next question**
+5. With **Auto play** on (the default), the game runs itself: the answer is revealed when everyone has answered or the timer runs out, the reveal stays up for 6 seconds (9 for Bluff, Closest and Most Likely), standings show for 5 seconds every 3 questions and before the final results, then the next question starts. A "Next in" countdown shows in the control bar and you can tap the button to skip ahead.
+6. Turn Auto play off to drive it yourself. **Auto reveal** can stay on alone, and after each reveal you choose **Standings** or **Next question**.
 7. The podium and awards drop after the last question. **Play again** keeps the same players.
 
 ### Players

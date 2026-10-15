@@ -8,13 +8,29 @@ import { SoundToggle } from '@/components/ui/SoundToggle'
 import { HostStage } from '@/components/gm/HostStage'
 import { DEFAULT_SETTINGS, GameSetup, poolSize } from '@/components/gm/GameSetup'
 import { ReactionLayer, useReactions } from '@/components/game/Reactions'
-import { serverNow } from '@/lib/clock'
+import { serverNow, useServerNow } from '@/lib/clock'
 import { sound } from '@/lib/sound'
 import { MIN_QUESTIONS, PICKABLE_CATEGORIES, ALL_TYPES, type GameSettings } from '@/lib/game/questions'
 import { formatTime, cn } from '@/lib/utils'
 
 const SETTINGS_KEY = 'the14_gm_settings'
 const AUTO_KEY = 'the14_gm_auto'
+const AUTOPLAY_KEY = 'the14_gm_autoplay'
+
+// Auto play pacing, in milliseconds.
+const INTRO_MS = 5000
+const REVEAL_MS = 6000
+const REVEAL_LONG_MS = 9000 // Bluff, Closest and Most Likely reveals have more to read.
+const STANDINGS_MS = 5000
+const STANDINGS_EVERY = 3
+
+function store(key: string, on: boolean) {
+  try {
+    window.localStorage.setItem(key, on ? '1' : '0')
+  } catch {
+    // Storage blocked, fine.
+  }
+}
 
 function loadSettings(): GameSettings {
   try {
@@ -49,9 +65,13 @@ export default function GMControlPage() {
   const [error, setError] = useState('')
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS)
   const [auto, setAuto] = useState(true)
+  const [autoPlay, setAutoPlay] = useState(true)
+  const [autoAt, setAutoAt] = useState<number | null>(null)
   const [joinUrl, setJoinUrl] = useState('/join')
   const [panelOpen, setPanelOpen] = useState(false)
   const autoFired = useRef<string | null>(null)
+  const playFired = useRef<string | null>(null)
+  const now = useServerNow(500)
 
   const { items } = useReactions(state?.game.id)
 
@@ -59,6 +79,7 @@ export default function GMControlPage() {
     setSettings(loadSettings())
     try {
       setAuto(window.localStorage.getItem(AUTO_KEY) !== '0')
+      setAutoPlay(window.localStorage.getItem(AUTOPLAY_KEY) !== '0')
     } catch {
       // Keep the default.
     }
@@ -76,11 +97,14 @@ export default function GMControlPage() {
 
   const toggleAuto = () => {
     setAuto((a) => {
-      try {
-        window.localStorage.setItem(AUTO_KEY, a ? '0' : '1')
-      } catch {
-        // Storage blocked, fine.
-      }
+      store(AUTO_KEY, !a)
+      return !a
+    })
+  }
+
+  const toggleAutoPlay = () => {
+    setAutoPlay((a) => {
+      store(AUTOPLAY_KEY, !a)
       return !a
     })
   }
@@ -114,9 +138,12 @@ export default function GMControlPage() {
   const phase = round?.data?.phase
   const realPlayers = useMemo(() => (state?.players ?? []).filter((p) => !p.is_game_master), [state?.players])
 
+  // Auto play always reveals automatically too.
+  const autoReveal = auto || autoPlay
+
   // Auto reveal: when everyone has answered, or the timer runs out.
   useEffect(() => {
-    if (!auto || !state || state.game.status !== 'active' || !round || !round.ends_at) return
+    if (!autoReveal || !state || state.game.status !== 'active' || !round || !round.ends_at) return
     if (!['active', 'voting'].includes(round.status)) return
     const key = `${round.id}:${round.status}:${phase ?? ''}`
     if (autoFired.current === key) return
@@ -129,7 +156,38 @@ export default function GMControlPage() {
       void control(action, undefined, true)
     }, delay)
     return () => clearTimeout(t)
-  }, [auto, state, round, phase, realPlayers.length, control])
+  }, [autoReveal, state, round, phase, realPlayers.length, control])
+
+  // Auto play: intro, reveal and standings move on by themselves.
+  const status = state?.game.status
+  const roundNo = state?.game.current_round ?? 0
+  const total = state?.game.total_questions ?? 0
+  const revealType = state?.reveal?.type
+  useEffect(() => {
+    setAutoAt(null)
+    // A new game (Play again) starts its question count from zero again.
+    if (status === 'waiting') playFired.current = null
+    if (!autoPlay || !status || !['category', 'question_result', 'leaderboard'].includes(status)) return
+    const key = `${status}:${roundNo}`
+    if (playFired.current === key) return
+
+    let delay = STANDINGS_MS
+    let action = 'next_question'
+    if (status === 'category') delay = INTRO_MS
+    if (status === 'question_result') {
+      delay = revealType === 'bluff' || revealType === 'closest' || revealType === 'mostlikely' ? REVEAL_LONG_MS : REVEAL_MS
+      // Standings every few questions and before the final results.
+      if (roundNo % STANDINGS_EVERY === 0 || roundNo >= total) action = 'show_leaderboard'
+    }
+
+    setAutoAt(serverNow() + delay)
+    const t = setTimeout(() => {
+      playFired.current = key
+      setAutoAt(null)
+      void control(action, undefined, true)
+    }, delay)
+    return () => clearTimeout(t)
+  }, [autoPlay, status, roundNo, total, revealType, control])
 
   if (!state) {
     return (
@@ -267,7 +325,7 @@ export default function GMControlPage() {
 
       {/* Control bar */}
       <footer className="sticky bottom-0 border-t border-stone-800 bg-stone-900/95 backdrop-blur px-4 md:px-8 py-3 safe-bottom">
-        <div className="flex items-center gap-2 max-w-5xl mx-auto">
+        <div className="flex flex-wrap items-center gap-2 max-w-5xl mx-auto">
           {(game.status === 'active' || game.status === 'question_result' || game.status === 'leaderboard' || game.status === 'category') && (
             <button
               type="button"
@@ -279,13 +337,14 @@ export default function GMControlPage() {
               End game
             </button>
           )}
-          {game.status === 'active' && (
-            <button type="button" onClick={toggleAuto} className="flex items-center gap-2 text-xs text-stone-400 px-2 py-2" aria-pressed={auto}>
-              <span className={cn('w-7 h-4 rounded-full relative transition-colors', auto ? 'bg-emerald-600' : 'bg-stone-700')}>
-                <span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', auto ? 'left-3.5' : 'left-0.5')} />
-              </span>
-              Auto reveal
-            </button>
+          {['category', 'active', 'question_result', 'leaderboard'].includes(game.status) && (
+            <>
+              <Switch on={autoPlay} onClick={toggleAutoPlay} label="Auto play" />
+              {!autoPlay && game.status === 'active' && <Switch on={auto} onClick={toggleAuto} label="Auto reveal" />}
+            </>
+          )}
+          {autoAt && (
+            <span className="text-xs text-stone-500 tabular-nums">Next in {Math.max(1, Math.ceil((autoAt - now) / 1000))}s</span>
           )}
           <div className="flex-1 text-right text-sm text-rose-400 truncate">{error}</div>
           {secondary && (
@@ -314,5 +373,16 @@ export default function GMControlPage() {
         </div>
       </footer>
     </main>
+  )
+}
+
+function Switch({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button type="button" onClick={onClick} className="flex items-center gap-2 text-xs text-stone-400 px-2 py-2" aria-pressed={on}>
+      <span className={cn('w-7 h-4 rounded-full relative transition-colors', on ? 'bg-emerald-600' : 'bg-stone-700')}>
+        <span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', on ? 'left-3.5' : 'left-0.5')} />
+      </span>
+      {label}
+    </button>
   )
 }
