@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
+import { InstallApp } from '@/components/InstallApp'
 
 export default function GMPage() {
   const router = useRouter()
@@ -48,6 +49,8 @@ export default function GMPage() {
             CREATE NEW GAME
           </Button>
         </div>
+
+        <InstallApp />
 
         <div className="border-t border-stone-100 pt-6">
           <button

@@ -211,7 +211,12 @@ To add a category, add it to the `Category` type and `CATEGORIES` in `schema.ts`
 
 ## Install as an App
 
-Installable as a home screen app on mobile.
+Installable as a home screen app on mobile. The join page and GM page show a "Get the app" card that adapts to the phone:
+
+- **Android (Chrome, Edge, Samsung)**: an Install button that opens the install dialog in one tap
+- **iPhone (Safari)**: the exact steps, Share then Add to Home Screen
+- **Inside WhatsApp, Instagram and similar**: these cannot install apps, so the card explains how to open the page in Chrome or Safari and offers a Copy link button
+- **Already installed**: the card stays hidden. Players can also close it, and it stays away for a week.
 
 - **iPhone**: Safari → Share → Add to Home Screen
 - **Android**: Chrome will prompt automatically

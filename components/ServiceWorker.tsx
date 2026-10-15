@@ -1,5 +1,7 @@
 'use client'
 import { useEffect } from 'react'
+// Imported here so the install prompt listener starts on every page.
+import '@/lib/install'
 
 /** Registers the service worker so the app can be installed. */
 export function ServiceWorker() {
