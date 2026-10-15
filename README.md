@@ -121,7 +121,7 @@ Every player also gets a tag, so nobody leaves empty handed. Award winners keep 
 
 ### Result cards
 
-- **Players** can share or save a 1080 x 1920 card (status and story size) with their placing, tag, stats (answers right, best streak, average speed) and the top 5. If they finished outside the top 5, their own row is added at the bottom.
+- **Players** can share or save a 1080 x 1920 card (status and story size) with their placing, tag and stats (answers right, best streak, average speed), a podium with the top 3, and places 4 to 6 listed below it. If they finished 7th or lower, their own row is added at the bottom.
 - **The GM** gets a group card on the podium screen with the top 3 and every player with their tag, ready to post in the group chat.
 
 ---

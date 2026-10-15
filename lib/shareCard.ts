@@ -271,6 +271,65 @@ function statTiles(c: Ctx, tiles: { value: string; label: string }[], y: number,
   })
 }
 
+/**
+ * Mini podium: 2nd, 1st, 3rd on blocks. `scale` shrinks it for the player
+ * card; the viewer's own spot gets a ring in their colour.
+ */
+async function miniPodium(
+  c: Ctx,
+  rows: StandingRow[],
+  tags: Record<string, PlayerTag>,
+  base: number,
+  scale = 1,
+  highlight?: string,
+  accent = DEFAULT_ACCENT,
+) {
+  const { ctx, font } = c
+  const byPlace = (n: number) => rows[n]
+  const slots = [
+    { r: byPlace(1), h: 110, color: C.silver, text: C.soft },
+    { r: byPlace(0), h: 160, color: C.gold, text: C.bg },
+    { r: byPlace(2), h: 80, color: C.bronze, text: C.muted },
+  ]
+  const colW = 230 * scale
+  const colGap = 30 * scale
+  const startX = (W - (colW * 3 + colGap * 2)) / 2
+  for (let i = 0; i < slots.length; i++) {
+    const { r, h: rawH, color, text } = slots[i]
+    if (!r) continue
+    const e = r.entry
+    const h = rawH * scale
+    const x = startX + i * (colW + colGap)
+    const blockTop = base - h
+    const av = Math.round(104 * scale)
+    const avY = blockTop - av - 100 * scale
+    if (e.player_id === highlight) {
+      ctx.beginPath()
+      ctx.arc(x + colW / 2, avY + av / 2, av / 2 + 8, 0, Math.PI * 2)
+      ctx.strokeStyle = rgba(accent, 0.7)
+      ctx.lineWidth = 3
+      ctx.stroke()
+    }
+    await drawAvatar(ctx, e.avatar, x + (colW - av) / 2, avY, av, font)
+    ctx.textAlign = 'center'
+    ctx.fillStyle = e.player_id === highlight ? C.text : C.soft
+    ctx.font = `500 ${Math.round(28 * scale)}px ${font}`
+    ctx.fillText(fitText(ctx, e.name, colW - 10), x + colW / 2, blockTop - 56 * scale)
+    const tag = tags[e.player_id]?.title
+    if (tag) {
+      ctx.fillStyle = C.muted
+      ctx.font = `400 ${Math.round(22 * scale)}px ${font}`
+      ctx.fillText(fitText(ctx, tag, colW - 10), x + colW / 2, blockTop - 22 * scale)
+    }
+    roundRect(ctx, x, blockTop, colW, h, 18 * scale)
+    ctx.fillStyle = color
+    ctx.fill()
+    ctx.fillStyle = text
+    ctx.font = `300 ${Math.round(34 * scale)}px ${font}`
+    ctx.fillText(ordinal(r.rank), x + colW / 2, blockTop + 48 * scale)
+  }
+}
+
 async function playerCard(c: Ctx, input: ShareCardInput) {
   const { ctx, font } = c
   const me = input.me!
@@ -280,16 +339,15 @@ async function playerCard(c: Ctx, input: ShareCardInput) {
   const s = input.stats[me.player_id]
   const accent = accentOf(me.avatar)
 
-  // Sizes shrink a little when the standings need more room.
-  const hero = 240
-  const heroY = 235
-  const nameY = heroY + hero + 72
-  const placeSize = 128
-  const placeY = nameY + placeSize + 8
-  const pointsY = placeY + 58
-  const chipY = pointsY + 42
-  const tilesY = chipY + 110
-  const tilesH = 140
+  const hero = 200
+  const heroY = 215
+  const nameY = heroY + hero + 66
+  const placeSize = 112
+  const placeY = nameY + placeSize + 4
+  const pointsY = placeY + 54
+  const chipY = pointsY + 38
+  const tilesY = chipY + 100
+  const tilesH = 122
 
   // Thin ring around the avatar.
   ctx.beginPath()
@@ -353,20 +411,30 @@ async function playerCard(c: Ctx, input: ShareCardInput) {
     )
   }
 
+  // Podium for the top 3, places 4 to 6 below it, then your own row if lower.
   const all = rankRows(input.scores)
-  const top = all.slice(0, 5)
+  const podiumTop = tilesY + tilesH + 70
+  label(c, 'Podium', PAD, podiumTop)
+  const scale = 0.92
+  // Tallest column: avatar, name, tag and the 1st place block.
+  const podiumBase = podiumTop + 30 + Math.round((104 + 100 + 160) * scale)
+  await miniPodium(c, all, input.tags, podiumBase, scale, me.player_id, accent)
+
+  const next = all.slice(3, 6)
   const mine = all.find((r) => r.entry.player_id === me.player_id)
-  const inTop = top.some((r) => r.entry.player_id === me.player_id)
-  const rows = inTop || !mine ? top : [...top, mine]
-  await standings(c, input, rows, {
-    top: (s ? tilesY + tilesH : chipY + 72) + 80,
-    bottom: H - 150,
-    title: sorted.length > 5 ? `Top 5 of ${sorted.length}` : 'Standings',
-    highlight: me.player_id,
-    accent,
-    dividerBefore: inTop ? undefined : 5,
-    details: true,
-  })
+  const shown = all.slice(0, 6).some((r) => r.entry.player_id === me.player_id)
+  const rows = shown || !mine ? next : [...next, mine]
+  if (rows.length) {
+    await standings(c, input, rows, {
+      top: podiumBase + 16,
+      bottom: H - 140,
+      title: '',
+      highlight: me.player_id,
+      accent,
+      dividerBefore: shown ? undefined : next.length,
+      details: true,
+    })
+  }
 }
 
 async function groupCard(c: Ctx, input: ShareCardInput) {
@@ -379,35 +447,7 @@ async function groupCard(c: Ctx, input: ShareCardInput) {
   ctx.fillText('Final results', W / 2, 285)
   label(c, `${sorted.length} players`, W / 2, 338, 'center')
 
-  // Mini podium
-  const top = sorted.slice(0, 3)
-  const slots = [
-    { e: top[1], place: 2, h: 110, color: C.silver, text: C.soft },
-    { e: top[0], place: 1, h: 160, color: C.gold, text: C.bg },
-    { e: top[2], place: 3, h: 80, color: C.bronze, text: C.muted },
-  ]
-  const colW = 230
-  const colGap = 30
-  const startX = (W - (colW * 3 + colGap * 2)) / 2
-  const base = 760
-  for (let i = 0; i < slots.length; i++) {
-    const { e, place, h, color, text } = slots[i]
-    if (!e) continue
-    const x = startX + i * (colW + colGap)
-    const blockTop = base - h
-    const av = 104
-    await drawAvatar(ctx, e.avatar, x + (colW - av) / 2, blockTop - av - 70, av, font)
-    ctx.textAlign = 'center'
-    ctx.fillStyle = C.soft
-    ctx.font = `500 28px ${font}`
-    ctx.fillText(fitText(ctx, e.name, colW - 10), x + colW / 2, blockTop - 32)
-    roundRect(ctx, x, blockTop, colW, h, 18)
-    ctx.fillStyle = color
-    ctx.fill()
-    ctx.fillStyle = text
-    ctx.font = `300 34px ${font}`
-    ctx.fillText(ordinal(place), x + colW / 2, blockTop + 48)
-  }
+  await miniPodium(c, rankRows(input.scores), input.tags, 760)
 
   await standings(c, input, rankRows(input.scores), { top: 850, bottom: H - 150, title: 'Everyone', details: input.scores.length <= 8 })
 }
