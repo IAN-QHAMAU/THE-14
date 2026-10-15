@@ -9,7 +9,7 @@ import {
   type GameSettings,
   type RoundData,
 } from '@/lib/game/questions'
-import { buildBluffOptions, computeAwards, computeRanks, gradeRound } from '@/lib/game/scoring'
+import { buildBluffOptions, computeAwards, computePlayerStats, computeRanks, computeTags, gradeRound } from '@/lib/game/scoring'
 import type { Game, GameStatus, Player, Round, RoundStatus } from '@/types'
 
 const db = () => createServerSupabase()
@@ -255,12 +255,14 @@ export async function finishGame(gameId: string) {
     client.from('players').select('id, score, best_streak').eq('game_id', gameId).eq('is_game_master', false),
   ])
   const awards = computeAwards(reveals, players ?? [])
+  const stats = computePlayerStats(reveals, players ?? [])
+  const tags = computeTags(stats, players ?? [], awards)
 
   await client
     .from('games')
     .update({ status: 'finished' as GameStatus, ended_at: new Date().toISOString() })
     .eq('id', gameId)
-  await logEvent(gameId, null, 'game_ended', { awards })
+  await logEvent(gameId, null, 'game_ended', { awards, stats, tags })
 }
 
 // ─── Events ────────────────────────────────────────────────────────────────

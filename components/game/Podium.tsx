@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react'
 import { AvatarDisplay } from '@/components/ui/Avatar'
 import { sound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
-import type { Award, PlayerScoreEntry } from '@/types'
+import type { Award, PlayerScoreEntry, PlayerTag } from '@/types'
 
 interface Props {
   scores: PlayerScoreEntry[]
   awards?: Award[]
+  tags?: Record<string, PlayerTag>
   myPlayerId?: string
   size?: 'phone' | 'stage'
   children?: React.ReactNode
@@ -16,7 +17,7 @@ interface Props {
 
 const PLACE = ['1st', '2nd', '3rd']
 
-export function Podium({ scores, awards = [], myPlayerId, size = 'phone', children }: Props) {
+export function Podium({ scores, awards = [], tags = {}, myPlayerId, size = 'phone', children }: Props) {
   const [step, setStep] = useState(0)
   const stage = size === 'stage'
 
@@ -55,6 +56,12 @@ export function Podium({ scores, awards = [], myPlayerId, size = 'phone', childr
         {myRank > 0 && step >= 4 && (
           <p className="text-sm text-stone-400 mt-2 animate-fade-in">
             {myRank === 1 ? 'You won. Well played.' : `You finished ${myRank} of ${sorted.length}.`}
+            {myPlayerId && tags[myPlayerId] && (
+              <span className="block text-stone-200 mt-1">
+                {tags[myPlayerId].title}
+                <span className="text-stone-500"> · {tags[myPlayerId].detail}</span>
+              </span>
+            )}
           </p>
         )}
       </header>
@@ -73,6 +80,9 @@ export function Podium({ scores, awards = [], myPlayerId, size = 'phone', childr
                       {entry.name}
                     </p>
                     <p className={cn('font-mono text-stone-400', stage ? 'text-base' : 'text-xs')}>{entry.total}</p>
+                    {tags[entry.player_id] && (
+                      <p className={cn('text-stone-500 text-center truncate max-w-full', stage ? 'text-sm' : 'text-[10px]')}>{tags[entry.player_id].title}</p>
+                    )}
                   </>
                 )}
               </div>
@@ -123,7 +133,10 @@ export function Podium({ scores, awards = [], myPlayerId, size = 'phone', childr
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-xs text-stone-500 w-4">{index + 4}</span>
                   <AvatarDisplay avatarId={entry.avatar} size="sm" />
-                  <span className="text-sm text-stone-300 truncate">{entry.name}</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm text-stone-300 truncate">{entry.name}</span>
+                    {tags[entry.player_id] && <span className="block text-[11px] text-stone-500 truncate">{tags[entry.player_id].title}</span>}
+                  </span>
                 </div>
                 <span className="font-mono text-sm text-stone-400">{entry.total}</span>
               </div>

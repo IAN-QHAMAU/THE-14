@@ -1,7 +1,7 @@
 import type { Category, GameSettings, PublicQuestion, RoundData } from '@/lib/game/questions'
-import type { AnswerPayload, AnswerStat, Award, RevealPayload } from '@/lib/game/scoring'
+import type { AnswerPayload, AnswerStat, Award, PlayerStats, PlayerTag, RevealPayload } from '@/lib/game/scoring'
 
-export type { AnswerPayload, AnswerStat, Award, RevealPayload, PublicQuestion, RoundData }
+export type { AnswerPayload, AnswerStat, Award, PlayerStats, PlayerTag, RevealPayload, PublicQuestion, RoundData }
 
 export type GameStatus = 'waiting' | 'category' | 'active' | 'question_result' | 'leaderboard' | 'finished'
 export type RoundStatus = 'pending' | 'active' | 'voting' | 'locked' | 'revealing' | 'complete'
@@ -97,5 +97,8 @@ export interface GameStateResponse {
   myRank: number
   myScore: number
   awards: Award[]
+  /** Final per-player stats and tags, once the game is finished. */
+  stats: Record<string, PlayerStats>
+  tags: Record<string, PlayerTag>
   events: GameEvent[]
 }

@@ -409,3 +409,99 @@ export function computeAwards(
 
   return awards
 }
+
+// ─── Player stats and tags ─────────────────────────────────────────────────
+// Every player gets exactly one tag so nobody leaves without something to
+// share. Award winners keep their award as their tag.
+
+export interface PlayerStats {
+  correct: number
+  /** Questions with a right answer (party rounds excluded). */
+  graded: number
+  answered: number
+  /** Average time on correct timed answers, in ms. */
+  avgMs: number | null
+  bestStreak: number
+  /** Places gained from halfway to the end. */
+  climb: number
+  fastWrong: number
+  fooled: number
+}
+
+export interface PlayerTag {
+  title: string
+  detail: string
+}
+
+export function computePlayerStats(
+  reveals: RevealPayload[],
+  players: { id: string; best_streak: number }[],
+): Record<string, PlayerStats> {
+  const out: Record<string, PlayerStats> = {}
+  const times = new Map<string, number[]>()
+  for (const p of players) {
+    out[p.id] = { correct: 0, graded: 0, answered: 0, avgMs: null, bestStreak: p.best_streak ?? 0, climb: 0, fastWrong: 0, fooled: 0 }
+  }
+  for (const rev of reveals) {
+    const graded = isGradedType(rev.type)
+    const timed = OPTION_TYPES.includes(rev.type) || rev.type === 'order'
+    for (const p of players) {
+      const s = out[p.id]
+      const r = rev.results[p.id]
+      if (graded) s.graded++
+      if (!r) continue
+      if (r.answered) s.answered++
+      if (r.correct) s.correct++
+      if (r.tooFast && r.correct === false) s.fastWrong++
+      s.fooled += r.fooled ?? 0
+      if (timed && r.correct && r.timeMs != null) times.set(p.id, [...(times.get(p.id) ?? []), r.timeMs])
+    }
+  }
+  for (const [id, t] of times) {
+    if (out[id] && t.length) out[id].avgMs = t.reduce((a, b) => a + b, 0) / t.length
+  }
+  if (reveals.length >= 4) {
+    const mid = reveals[Math.floor(reveals.length / 2) - 1].rank_after
+    const final = reveals[reveals.length - 1].rank_after
+    for (const p of players) {
+      if (out[p.id] && mid[p.id] && final[p.id]) out[p.id].climb = mid[p.id] - final[p.id]
+    }
+  }
+  return out
+}
+
+export function computeTags(
+  stats: Record<string, PlayerStats>,
+  players: { id: string; score: number }[],
+  awards: Award[],
+): Record<string, PlayerTag> {
+  const ranked = [...players].sort((a, b) => b.score - a.score)
+  const tags: Record<string, PlayerTag> = {}
+  ranked.forEach((p, i) => {
+    const award = awards.find((a) => a.player_id === p.id)
+    if (award) {
+      tags[p.id] = { title: award.title, detail: award.detail }
+      return
+    }
+    const s = stats[p.id]
+    const rank = ranked.filter((o) => o.score > p.score).length + 1
+    const last = i === ranked.length - 1 && ranked.length > 2
+    const acc = s && s.graded ? s.correct / s.graded : 0
+    const right = s ? `${s.correct} of ${s.graded} right` : ''
+    let tag: PlayerTag
+    if (rank === 1) tag = { title: 'Champion', detail: `${p.score.toLocaleString()} points` }
+    else if (s && s.graded >= 3 && acc >= 0.8) tag = { title: 'Brainbox', detail: right }
+    else if (s?.avgMs != null && s.avgMs < 3000) tag = { title: 'Quick draw', detail: `${(s.avgMs / 1000).toFixed(1)}s average` }
+    else if (s && s.bestStreak >= 3) tag = { title: 'On fire', detail: `${s.bestStreak} in a row` }
+    else if (s && s.climb >= 2) tag = { title: 'Climber', detail: `Up ${s.climb} places` }
+    else if (s && s.fooled >= 1) tag = { title: 'Sneaky', detail: `Fooled ${s.fooled}` }
+    else if (s && s.fastWrong >= 2) tag = { title: 'Trigger happy', detail: `${s.fastWrong} speedy misses` }
+    else if (s && s.graded && s.correct === 0) tag = { title: 'Here for the vibes', detail: 'Next game is yours' }
+    else if (last) tag = { title: 'Warming up', detail: 'Next game is yours' }
+    else if (s && acc >= 0.5) tag = { title: 'Steady', detail: right }
+    else if (s && s.graded && s.answered < s.graded / 2) tag = { title: 'Taking it easy', detail: `${s.answered} answered` }
+    else tag = { title: 'Wildcard', detail: right || 'Full of surprises' }
+    tags[p.id] = tag
+  })
+  return tags
+}

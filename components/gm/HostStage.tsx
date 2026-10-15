@@ -7,6 +7,7 @@ import { GameIntro } from '@/components/game/GameIntro'
 import { RevealBoard } from '@/components/game/RevealBoard'
 import { Standings } from '@/components/game/Standings'
 import { Podium } from '@/components/game/Podium'
+import { ShareCard } from '@/components/game/ShareCard'
 import { PromptExtras } from '@/components/game/answers'
 import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
 import { useServerNow } from '@/lib/clock'
@@ -60,7 +61,14 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
   }
 
   if (game.status === 'finished') {
-    return <Podium scores={state.scores} awards={state.awards} size="stage" />
+    return (
+      <Podium scores={state.scores} awards={state.awards} tags={state.tags} size="stage">
+        <div className="max-w-xs mx-auto w-full space-y-2">
+          <p className="text-xs tracking-widest uppercase text-stone-500 text-center">Group results card</p>
+          <ShareCard mode="group" scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
+        </div>
+      </Podium>
+    )
   }
 
   if (!round || !q) {
