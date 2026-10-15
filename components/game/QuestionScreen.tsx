@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
 import { TimerBar } from '@/components/ui/Countdown'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { GetReady } from '@/components/game/GetReady'
 import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PlayerVote, PromptExtras } from '@/components/game/answers'
-import { useServerNow } from '@/lib/clock'
+import { serverNow, useServerNow } from '@/lib/clock'
 import { quickTapLine } from '@/lib/game/lines'
 import { sound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
@@ -24,6 +24,13 @@ interface Props {
   onSubmit: (body: SubmitBody) => Promise<{ tooFast?: boolean; error?: string }>
 }
 
+/**
+ * Answers ignore taps for this long after they appear. Players often tap
+ * during the countdown, and without this the browser would deliver that tap
+ * to whichever answer button appears under their finger.
+ */
+const ARM_DELAY_MS = 500
+
 export function QuestionScreen({ state, onSubmit }: Props) {
   const { currentRound: round, currentQuestion: q, game, myPlayer } = state
   const now = useServerNow(200)
@@ -31,6 +38,12 @@ export function QuestionScreen({ state, onSubmit }: Props) {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // When the latest finger or mouse press started. A tap only counts if it
+  // started after the answers were ready.
+  const pressedAt = useRef<number | null>(null)
+  const onPress = () => {
+    pressedAt.current = serverNow()
+  }
 
   const phase = round?.data?.phase === 'write' ? 'write' : 'answer'
   const phaseKey = `${round?.id}:${phase}`
@@ -50,7 +63,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
 
   if (now < startsAt) {
     return (
-      <main className="min-h-[100dvh] bg-stone-900 text-stone-50 flex items-center justify-center px-6">
+      <main onPointerDownCapture={onPress} className="min-h-[100dvh] bg-stone-900 text-stone-50 flex items-center justify-center px-6">
         <GetReady
           question={q}
           number={round.round_number}
@@ -65,12 +78,18 @@ export function QuestionScreen({ state, onSubmit }: Props) {
   const timeUp = now > endsAt
   const serverAnswer = state.myAnswer
   const done = phase === 'write' ? Boolean(state.myBluff) : Boolean(serverAnswer) || pending !== null
+  const armedAt = startsAt + ARM_DELAY_MS
+  const armed = now >= armedAt
   const locked = done || timeUp || busy
   const cat = CATEGORIES[q.category]
   const type = GAME_TYPES[q.type]
 
   async function submit(body: SubmitBody) {
     if (locked) return
+    // Ignore a tap that began before the answers were ready (a carried over
+    // countdown tap). Keyboard presses have no pointer press and still work.
+    const pressed = pressedAt.current
+    if (serverNow() < armedAt || (pressed !== null && pressed < armedAt)) return
     sound.unlock()
     sound.tap()
     setPending(body)
@@ -148,7 +167,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
           : null
 
   return (
-    <main className="min-h-[100dvh] bg-stone-50 flex flex-col px-4 pt-6 pb-8 safe-top">
+    <main onPointerDownCapture={onPress} className="min-h-[100dvh] bg-stone-50 flex flex-col px-4 pt-6 pb-8 safe-top">
       <div className="max-w-md mx-auto w-full flex flex-col gap-5 flex-1">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
@@ -167,7 +186,9 @@ export function QuestionScreen({ state, onSubmit }: Props) {
           <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} />
         </div>
 
-        <div className="flex-1">{body}</div>
+        <div className={cn('flex-1 transition-opacity duration-300', armed ? 'opacity-100' : 'opacity-40 pointer-events-none')} aria-busy={!armed}>
+          {body}
+        </div>
 
         <footer className="text-center space-y-1 min-h-[2.5rem]" aria-live="polite">
           {status && (

@@ -150,7 +150,6 @@ export function answerWindowSeconds(type: QuestionType, timer: number, phase: 'a
   if (type === 'bluff' && phase === 'write') return Math.max(timer, 30) + 10
   if (type === 'order') return timer + 10
   if (type === 'closest') return timer + 5
-  if (type === 'truefalse') return Math.max(8, Math.round(timer * 0.75))
   return timer
 }
 

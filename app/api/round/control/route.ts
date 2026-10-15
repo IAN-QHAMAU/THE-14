@@ -72,6 +72,8 @@ export async function POST(req: NextRequest) {
       }
       const players = await getPlayers(gameId)
       const round = await startNextQuestion(game, players)
+      // Another host screen or a double tap already moved on: nothing to do.
+      if (round === 'busy') return NextResponse.json({ success: true, skipped: true })
       if (!round) return NextResponse.json({ error: 'Could not start the next question.' }, { status: 500 })
       return NextResponse.json({ success: true })
     }

@@ -80,6 +80,9 @@ export interface PlayerScoreEntry {
 
 /** Everything /api/game/state returns. */
 export interface GameStateResponse {
+  /** When the server received the request (ms). */
+  serverStart: number
+  /** When the server sent the response (ms). */
   serverNow: number
   game: Game
   players: Player[]

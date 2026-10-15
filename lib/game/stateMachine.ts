@@ -85,9 +85,12 @@ async function completeOpenRounds(gameId: string) {
     .in('status', ['revealing', 'locked'])
 }
 
-export async function startNextQuestion(game: Game, players: Player[]) {
+/**
+ * Starts the next question. Returns 'busy' when another host screen (or a
+ * double tap) already moved the game on, so the same step never runs twice.
+ */
+export async function startNextQuestion(game: Game, players: Player[]): Promise<Round | null | 'busy'> {
   const client = db()
-  await completeOpenRounds(game.id)
 
   const { data: rounds } = await client
     .from('rounds')
@@ -118,6 +121,18 @@ export async function startNextQuestion(game: Game, players: Player[]) {
   }
   if (question.type === 'bluff') data.phase = 'write'
 
+  // Claim the step: only one caller can move the game from this exact state.
+  const { data: claimed } = await client
+    .from('games')
+    .update({ status: 'active' as GameStatus, current_round: round.round_number })
+    .eq('id', game.id)
+    .eq('current_round', game.current_round)
+    .in('status', ['category', 'question_result', 'leaderboard'])
+    .select('id')
+  if (!claimed?.length) return 'busy'
+
+  await completeOpenRounds(game.id)
+
   const startsAt = new Date(Date.now() + GET_READY_MS)
   const seconds = answerWindowSeconds(question.type, timer, question.type === 'bluff' ? 'write' : 'answer')
   const endsAt = new Date(startsAt.getTime() + seconds * 1000)
@@ -131,11 +146,7 @@ export async function startNextQuestion(game: Game, players: Player[]) {
       ends_at: endsAt.toISOString(),
     })
     .eq('id', round.id)
-
-  await client
-    .from('games')
-    .update({ status: 'active' as GameStatus, current_round: round.round_number })
-    .eq('id', game.id)
+    .eq('status', 'pending')
 
   await logEvent(game.id, round.id, 'round_started', { round_number: round.round_number })
   return round
@@ -232,8 +243,14 @@ export async function lockAndRevealQuestion(gameId: string, round: Round) {
 }
 
 export async function showLeaderboard(gameId: string) {
+  const { data: claimed } = await db()
+    .from('games')
+    .update({ status: 'leaderboard' as GameStatus })
+    .eq('id', gameId)
+    .eq('status', 'question_result')
+    .select('id')
+  if (!claimed?.length) return
   await completeOpenRounds(gameId)
-  await db().from('games').update({ status: 'leaderboard' as GameStatus }).eq('id', gameId)
 }
 
 export async function hasPendingRounds(gameId: string) {
@@ -258,10 +275,14 @@ export async function finishGame(gameId: string) {
   const stats = computePlayerStats(reveals, players ?? [])
   const tags = computeTags(stats, players ?? [], awards)
 
-  await client
+  // Only the first caller finishes the game and records the awards.
+  const { data: claimed } = await client
     .from('games')
     .update({ status: 'finished' as GameStatus, ended_at: new Date().toISOString() })
     .eq('id', gameId)
+    .neq('status', 'finished')
+    .select('id')
+  if (!claimed?.length) return
   await logEvent(gameId, null, 'game_ended', { awards, stats, tags })
 }
 
