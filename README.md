@@ -216,7 +216,9 @@ Installable as a home screen app on mobile.
 - **iPhone**: Safari → Share → Add to Home Screen
 - **Android**: Chrome will prompt automatically
 
-Opens fullscreen, no browser bar.
+Opens fullscreen, no browser bar, with its own icon and splash colour. A small service worker makes it installable and shows a friendly offline screen if the connection drops. Game data always comes live from the server.
+
+If you installed an older version that did not work, remove it from your home screen and add it again.
 
 ---
 
