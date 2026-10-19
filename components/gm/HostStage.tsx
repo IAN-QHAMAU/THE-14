@@ -13,6 +13,7 @@ import { DifficultyBadge } from '@/components/game/DifficultyBadge'
 import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
 import { useState } from 'react'
 import { useServerNow } from '@/lib/clock'
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import type { GameStateResponse } from '@/types'
 
@@ -21,6 +22,8 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'
 export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUrl: string }) {
   const { game, currentRound: round, currentQuestion: q } = state
   const now = useServerNow(200)
+  // Big TV sizes on a laptop or TV, phone sizes when the host uses a phone.
+  const size = useMediaQuery('(min-width: 768px)') ? 'stage' : 'phone'
   const players = state.players.filter((p) => !p.is_game_master)
 
   // ── Lobby ────────────────────────────────────────────────────────────────
@@ -50,7 +53,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
     )
   }
 
-  if (game.status === 'category') return <GameIntro game={game} size="stage" />
+  if (game.status === 'category') return <GameIntro game={game} size={size} />
 
   if (game.status === 'leaderboard') {
     return (
@@ -58,7 +61,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         <Standings
           scores={state.scores}
           lastReveal={state.lastReveal}
-          size="stage"
+          size={size}
           limit={10}
           subtitle={`After question ${game.current_round} of ${game.total_questions}`}
         />
@@ -68,7 +71,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 
   if (game.status === 'finished') {
     return (
-      <Podium scores={state.scores} awards={state.awards} tags={state.tags} size="stage">
+      <Podium scores={state.scores} awards={state.awards} tags={state.tags} size={size}>
         <div className="max-w-xs mx-auto w-full space-y-2">
           <p className="text-xs tracking-widest uppercase text-stone-500 text-center">Group results card</p>
           <ShareCard mode="group" scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
@@ -99,7 +102,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
           reveal={state.reveal}
           question={q}
           players={state.players}
-          size="stage"
+          size={size}
           dark
           optionAvatars={round.data?.players?.map((p) => p.avatar)}
         />
@@ -121,7 +124,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         number={round.round_number}
         total={game.total_questions}
         startsAt={round.starts_at}
-        size="stage"
+        size={size}
         label={isVote ? 'Voting time' : undefined}
       />
     )
@@ -132,7 +135,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8 animate-fade-in">
-      <div className="flex items-center justify-between text-sm text-stone-400">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-stone-400">
         <span>
           {q.category === 'party' ? '🎉' : cat.emoji} {q.category === 'party' ? type.label : cat.label} · Question {round.round_number} of {game.total_questions}
         </span>
@@ -146,7 +149,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 
       <h2 className="text-3xl md:text-5xl font-light text-stone-50 leading-tight">{q.question}</h2>
 
-      <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} size="stage" />
+      <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} size={size} />
 
       {isWrite ? (
         <p className="text-lg text-stone-400">Players are writing their fakes on their phones.</p>
