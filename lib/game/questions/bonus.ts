@@ -17,7 +17,6 @@ export const BONUS_QUESTIONS: RawChoiceQuestion[] = [
   c('wr1', 'records', 'Which skyscraper in Dubai is the world\'s tallest building?', ['Shanghai Tower', 'Burj Khalifa', 'One World Trade Center', 'Taipei 101'], 1),
   c('wr2', 'records', 'What is the largest animal known to have ever lived?', ['African elephant', 'Blue whale', 'Megalodon', 'Argentinosaurus'], 1),
   c('wr3', 'records', 'Counting cold deserts, what is the largest desert in the world?', ['Sahara', 'Arctic', 'Antarctica', 'Gobi'], 2, 200),
-  c('wr4', 'records', 'Which country has the largest population?', ['China', 'India', 'USA', 'Indonesia'], 1, 150),
   c('wr5', 'records', 'What is the longest river in South America?', ['Paraná', 'Orinoco', 'Amazon', 'Magdalena'], 2),
   c('wr6', 'records', 'What is the deepest known point in the ocean called?', ['Challenger Deep', 'Puerto Rico Trench', 'Java Trench', 'Tonga Deep'], 0, 200),
   c('wr7', 'records', 'Who has scored the most international goals in men\'s football?', ['Lionel Messi', 'Cristiano Ronaldo', 'Pelé', 'Ali Daei'], 1, 150),
@@ -99,7 +98,6 @@ export const BONUS_QUESTIONS: RawChoiceQuestion[] = [
   c('tv15', 'series', 'How many seasons does "Breaking Bad" have?', ['4', '5', '6', '7'], 1, 200),
 
   // ── Ocean & Nature ───────────────────────────────────────────────────────
-  c('na1', 'nature', 'What is the largest ocean on Earth?', ['Atlantic', 'Indian', 'Pacific', 'Arctic'], 2),
   c('na2', 'nature', 'Which sea creature has eight arms?', ['Squid', 'Octopus', 'Starfish', 'Jellyfish'], 1),
   c('na3', 'nature', 'What is the largest coral reef system in the world?', ['Belize Barrier Reef', 'Great Barrier Reef', 'Red Sea Reef', 'Mesoamerican Reef'], 1),
   c('na4', 'nature', 'Which gas do trees release that we breathe?', ['Carbon dioxide', 'Oxygen', 'Nitrogen', 'Methane'], 1),

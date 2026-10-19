@@ -91,21 +91,21 @@ Party rounds are capped at about one in six questions and never open the game.
 
 ## Categories
 
-863 questions across 40 categories, each marked easy, medium or hard.
+1696 questions across 44 categories, each marked easy, medium or hard.
 
 | Group | Categories (questions) |
 |---|---|
-| **Brain** | 🧠 General Knowledge (26), 🔬 Science (24), 🏛️ History (23), 🗺️ Flags & Places (36), 🪐 Space (19), 🧩 Riddles & Numbers (15), ⚡ Wild Facts (13), 💻 Tech (25), 🔤 Words & Language (16), ⚱️ Mythology (16), 🫀 Human Body (19), 🏆 World Records (15), 💡 Inventions (15), 🦖 Dinosaurs (15) |
-| **Pop Culture** | ⛩️ Anime (26), 🎬 Movies & TV (34), 🎵 Music (21), 🎮 Gaming (19), 📱 Internet Culture (14), 🦸 Superheroes (16), 📺 Cartoons (15), 📚 Books & Literature (17), 🥁 African Music (16), 🎤 Hip-Hop & R&B (15), 🍿 TV Series (15) |
-| **Sports** | 🏅 Sports Mix (15), ⚽ Football (23), 🏀 Basketball (14), 🏎️ Motorsport (13), 🏃 Athletics & Olympics (16), 🎾 Tennis, Rugby & Cricket (13) |
-| **Kenya & Africa** | 🇰🇪 Kenya (22), 🌍 Africa (28) |
-| **Lifestyle** | 🍕 Food & Drinks (17), 🚗 Cars (16), 🐘 Animals (19), 🏷️ Brands & Logos (16), 💰 Money & Business (17), 👗 Fashion (16), 🌊 Ocean & Nature (15) |
+| **Brain** | 🧠 General Knowledge (39), 🔬 Science (42), 🏛️ History (40), 🗺️ Flags & Places (53), 🪐 Space (37), 🧩 Riddles & Numbers (28), ⚡ Wild Facts (20), 💻 Tech (41), 🔤 Words & Language (29), ⚱️ Mythology (30), 🫀 Human Body (35), 🏆 World Records (25), 💡 Inventions (28), 🦖 Dinosaurs (30) |
+| **Pop Culture** | ⛩️ Anime (93), 🎬 Movies & TV (54), 🎵 Music (39), 🎮 Gaming (32), 📱 Internet Culture (27), 🦸 Superheroes (29), 📺 Cartoons (27), 📚 Books & Literature (33), 🥁 African Music (29), 🎤 Hip-Hop & R&B (28), 🍿 TV Series (31), 🏰 Disney & Pixar (29), 📼 2000s Throwback (29), 🔍 Mysteries & Detectives (28) |
+| **Sports** | 🏅 Sports Mix (28), ⚽ Football (40), 🏀 Basketball (27), 🏎️ Motorsport (26), 🏃 Athletics & Olympics (30), 🎾 Tennis, Rugby & Cricket (26), 🤼 Wrestling (29) |
+| **Kenya & Africa** | 🇰🇪 Kenya (37), 🌍 Africa (44) |
+| **Lifestyle** | 🍕 Food & Drinks (33), 🚗 Cars (30), 🐘 Animals (33), 🏷️ Brands & Logos (29), 💰 Money & Business (31), 👗 Fashion (30), 🌊 Ocean & Nature (27) |
 
-Plus 50 Most Likely To prompts, 38 Bluff prompts and 30 Would You Rather prompts that work with any category.
+Plus 90 Most Likely To prompts, 51 Bluff prompts and 70 Would You Rather prompts that work with any category.
 
 ### Difficulty
 
-Every question is easy (100 points), medium (150) or hard (200 and up), shown as a small badge. In setup the GM picks **Mixed**, **Rising** (a third each, easy to hard as the game goes on), **Easy**, **Medium** or **Hard**. The chosen level is filled first; if the picked categories run short, the nearest level tops it up. Setup shows how many easy, medium and hard questions the selected categories have.
+Every question is easy (100 points), medium (150) or hard (200 and up). Players never see the level on screen. In setup the GM picks **Mixed**, **Rising** (a third each, easy to hard as the game goes on), **Easy**, **Medium** or **Hard**. A chosen level is strict: a Hard game only uses hard questions, and if the picked categories run short the game is shorter rather than mixing in easier ones. Setup shows how many easy, medium and hard questions the selected categories have.
 
 ---
 
@@ -206,6 +206,10 @@ Questions live in `lib/game/questions/`:
 
 - `classic.ts`, `more.ts` and `extra.ts` hold multiple choice questions (`extra.ts` also has a few special types for the newer categories)
 - `special.ts` holds True or False, Emoji, Picture, Closest, Order, Most Likely To and Bluff
+- `bonus.ts`, `hardA.ts`, `hardB.ts`, `hardC.ts` and `hardTypes.ts` hold the hard rounds
+- `anime.ts` has the Death Note, Avatar, Attack on Titan and Castlevania packs
+- `fun.ts` has Disney & Pixar, 2000s Throwback, Mysteries & Detectives and Wrestling
+- `party.ts` has more Would You Rather, Most Likely To and Bluff prompts
 
 A classic question looks like this:
 
