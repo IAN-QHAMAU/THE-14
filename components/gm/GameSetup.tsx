@@ -11,6 +11,8 @@ import {
   PICKABLE_CATEGORIES,
   TIMER_OPTIONS,
   buildPool,
+  difficultyOf,
+  DIFFICULTY_SETTINGS,
   countQuestions,
   type Category,
   type CategoryGroup,
@@ -24,6 +26,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   types: ['choice', 'truefalse', 'emoji', 'closest'],
   timer: 20,
   questionCount: 12,
+  difficulty: 'mixed',
 }
 
 export function poolSize(settings: GameSettings) {
@@ -54,7 +57,13 @@ function Chip({ active, onClick, children, className }: { active: boolean; onCli
 
 export function GameSetup({ settings, onChange }: Props) {
   const [group, setGroup] = useState<CategoryGroup>('brain')
-  const pool = useMemo(() => poolSize(settings), [settings])
+  const poolList = useMemo(() => buildPool(settings), [settings])
+  const pool = poolList.length
+  const levels = useMemo(() => {
+    const c = { easy: 0, medium: 0, hard: 0 }
+    for (const q of poolList) if (!GAME_TYPES[q.type].party) c[difficultyOf(q)]++
+    return c
+  }, [poolList])
   const maxQ = Math.max(MIN_QUESTIONS, Math.min(MAX_QUESTIONS, pool))
   const count = Math.min(settings.questionCount, maxQ)
 
@@ -164,6 +173,33 @@ export function GameSetup({ settings, onChange }: Props) {
             )
           })}
         </div>
+      </section>
+
+      {/* Difficulty */}
+      <section className="space-y-3">
+        <h2 className="text-xs uppercase tracking-widest text-stone-400">Difficulty</h2>
+        <div className="grid grid-cols-3 gap-1.5">
+          {DIFFICULTY_SETTINGS.map((d) => {
+            const active = (settings.difficulty ?? 'mixed') === d.id
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => set({ difficulty: d.id })}
+                aria-pressed={active}
+                className={cn(
+                  'rounded-xl border px-2 py-2 text-sm transition-colors',
+                  active ? 'border-stone-200 bg-stone-100 text-stone-900' : 'border-stone-700 text-stone-300 hover:border-stone-500',
+                )}
+              >
+                {d.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-xs text-stone-500">
+          {DIFFICULTY_SETTINGS.find((d) => d.id === (settings.difficulty ?? 'mixed'))?.hint} Your picks have {levels.easy} easy, {levels.medium} medium and {levels.hard} hard questions. Harder questions score more.
+        </p>
       </section>
 
       {/* Length and timer */}

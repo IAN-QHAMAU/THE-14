@@ -79,7 +79,7 @@ export function resultLine(
   opts: { timerMs: number; fellForNames?: string[] },
 ): ResultLine {
   if (!r || (!r.answered && !r.fooled)) {
-    if (type === 'mostlikely') return { headline: 'No vote.', tone: 'neutral' }
+    if (type === 'mostlikely' || type === 'wouldrather') return { headline: 'No vote.', tone: 'neutral' }
     return { headline: pickLine('missed', seed), sub: r?.lostStreak ? pickLine('lostStreak', seed) : undefined, tone: 'bad' }
   }
 
@@ -87,6 +87,7 @@ export function resultLine(
 
   switch (type) {
     case 'mostlikely':
+    case 'wouldrather':
       return r.points > 0
         ? { headline: pickLine('roomSided', seed), tone: 'good' }
         : { headline: pickLine('roomAlone', seed), tone: 'neutral' }

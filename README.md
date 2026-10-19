@@ -83,6 +83,7 @@ Open [http://localhost:3000](http://localhost:3000)
 | Put in Order | Tap four items in the right order |
 | Most Likely To | Party mode. Vote for a player. Side with the room to score. |
 | Bluff | Party mode. Everyone writes a fake answer, then tries to find the real one. Points for every player your fake fools. |
+| Would You Rather | Party mode. Pick one of two options. Side with the room to score. |
 
 Party rounds are capped at about one in six questions and never open the game.
 
@@ -90,17 +91,21 @@ Party rounds are capped at about one in six questions and never open the game.
 
 ## Categories
 
-651 questions across 34 categories.
+863 questions across 40 categories, each marked easy, medium or hard.
 
 | Group | Categories (questions) |
 |---|---|
-| **Brain** | 🧠 General Knowledge (22), 🔬 Science (20), 🏛️ History (20), 🗺️ Flags & Places (32), 🪐 Space (17), 🧩 Riddles & Numbers (15), ⚡ Wild Facts (13), 💻 Tech (23), 🔤 Words & Language (16), ⚱️ Mythology (16), 🫀 Human Body (19) |
-| **Pop Culture** | ⛩️ Anime (23), 🎬 Movies & TV (30), 🎵 Music (18), 🎮 Gaming (19), 📱 Internet Culture (14), 🦸 Superheroes (16), 📺 Cartoons (15), 📚 Books & Literature (17), 🥁 African Music (16) |
-| **Sports** | 🏅 Sports Mix (15), ⚽ Football (19), 🏀 Basketball (14), 🏎️ Motorsport (13), 🏃 Athletics & Olympics (15), 🎾 Tennis, Rugby & Cricket (13) |
-| **Kenya & Africa** | 🇰🇪 Kenya (19), 🌍 Africa (25) |
-| **Lifestyle** | 🍕 Food & Drinks (17), 🚗 Cars (16), 🐘 Animals (19), 🏷️ Brands & Logos (16), 💰 Money & Business (17), 👗 Fashion (16) |
+| **Brain** | 🧠 General Knowledge (26), 🔬 Science (24), 🏛️ History (23), 🗺️ Flags & Places (36), 🪐 Space (19), 🧩 Riddles & Numbers (15), ⚡ Wild Facts (13), 💻 Tech (25), 🔤 Words & Language (16), ⚱️ Mythology (16), 🫀 Human Body (19), 🏆 World Records (15), 💡 Inventions (15), 🦖 Dinosaurs (15) |
+| **Pop Culture** | ⛩️ Anime (26), 🎬 Movies & TV (34), 🎵 Music (21), 🎮 Gaming (19), 📱 Internet Culture (14), 🦸 Superheroes (16), 📺 Cartoons (15), 📚 Books & Literature (17), 🥁 African Music (16), 🎤 Hip-Hop & R&B (15), 🍿 TV Series (15) |
+| **Sports** | 🏅 Sports Mix (15), ⚽ Football (23), 🏀 Basketball (14), 🏎️ Motorsport (13), 🏃 Athletics & Olympics (16), 🎾 Tennis, Rugby & Cricket (13) |
+| **Kenya & Africa** | 🇰🇪 Kenya (22), 🌍 Africa (28) |
+| **Lifestyle** | 🍕 Food & Drinks (17), 🚗 Cars (16), 🐘 Animals (19), 🏷️ Brands & Logos (16), 💰 Money & Business (17), 👗 Fashion (16), 🌊 Ocean & Nature (15) |
 
-Plus 20 Most Likely To prompts and 16 Bluff prompts that work with any category.
+Plus 50 Most Likely To prompts, 38 Bluff prompts and 30 Would You Rather prompts that work with any category.
+
+### Difficulty
+
+Every question is easy (100 points), medium (150) or hard (200 and up), shown as a small badge. In setup the GM picks **Mixed**, **Rising** (a third each, easy to hard as the game goes on), **Easy**, **Medium** or **Hard**. The chosen level is filled first; if the picked categories run short, the nearest level tops it up. Setup shows how many easy, medium and hard questions the selected categories have.
 
 ---
 
@@ -113,7 +118,7 @@ Plus 20 Most Likely To prompts and 16 Bluff prompts that work with any category.
 | Streak of 3 or more correct | +50 per question while it lasts |
 | Closest Wins | Up to full points depending on how close, plus a bonus for the closest guess |
 | Put in Order | Full points and speed bonus for a perfect order, partial points for some in place |
-| Most Likely To | Full points if you voted with the majority |
+| Most Likely To, Would You Rather | Full points if you voted with the majority |
 | Bluff | Full points for finding the real answer, +75 for every player who picks your fake |
 | Wrong or no answer | 0 |
 

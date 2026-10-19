@@ -19,6 +19,8 @@ import {
   MIN_QUESTIONS,
   PICKABLE_CATEGORIES,
   TIMER_OPTIONS,
+  DIFFICULTY_SETTINGS,
+  type DifficultySetting,
   type Category,
   type GameSettings,
   type QuestionType,
@@ -36,7 +38,8 @@ function parseSettings(raw: unknown): GameSettings | null {
   if (!types.length) return null
   const timer = TIMER_OPTIONS.includes(Number(r.timer)) ? Number(r.timer) : 20
   const questionCount = Math.min(MAX_QUESTIONS, Math.max(MIN_QUESTIONS, Number(r.questionCount) || 10))
-  return { categories: [...new Set(categories)], types: [...new Set(types)], timer, questionCount }
+  const difficulty = DIFFICULTY_SETTINGS.some((d) => d.id === r.difficulty) ? (r.difficulty as DifficultySetting) : 'mixed'
+  return { categories: [...new Set(categories)], types: [...new Set(types)], timer, questionCount, difficulty }
 }
 
 export async function POST(req: NextRequest) {

@@ -42,6 +42,7 @@ function loadSettings(): GameSettings {
       types: (s.types ?? []).filter((t) => ALL_TYPES.includes(t)),
       timer: s.timer ?? 20,
       questionCount: s.questionCount ?? 12,
+      difficulty: s.difficulty ?? 'mixed',
     }
   } catch {
     return DEFAULT_SETTINGS

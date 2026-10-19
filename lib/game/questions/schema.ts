@@ -9,18 +9,21 @@ export type QuestionType =
   | 'order'
   | 'mostlikely'
   | 'bluff'
+  | 'wouldrather'
 
 export type Category =
   // Brain
   | 'general' | 'science' | 'history' | 'geography' | 'space' | 'logic' | 'facts' | 'tech' | 'words' | 'mythology' | 'body'
+  | 'records' | 'inventions' | 'dinosaurs'
   // Pop culture
   | 'anime' | 'movies' | 'music' | 'gaming' | 'internet' | 'heroes' | 'cartoons' | 'books' | 'afromusic'
+  | 'hiphop' | 'series'
   // Sports
   | 'sports' | 'football' | 'basketball' | 'motorsport' | 'olympics' | 'racket'
   // Kenya & Africa
   | 'kenya' | 'africa'
   // Lifestyle
-  | 'food' | 'cars' | 'animals' | 'brands' | 'money' | 'fashion'
+  | 'food' | 'cars' | 'animals' | 'brands' | 'money' | 'fashion' | 'nature'
   // Party modes (not picked as a category, used by social game types)
   | 'party'
 
@@ -30,7 +33,32 @@ interface BaseQuestion {
   question: string
   points: number
   speedBonus: number
+  /** Optional override; otherwise worked out from points. */
+  difficulty?: Difficulty
 }
+
+export type Difficulty = 'easy' | 'medium' | 'hard'
+
+/** Harder questions are worth more, so points tell us the level. */
+export function difficultyOf(q: { points: number; difficulty?: Difficulty }): Difficulty {
+  if (q.difficulty) return q.difficulty
+  if (q.points >= 200) return 'hard'
+  if (q.points >= 150) return 'medium'
+  return 'easy'
+}
+
+export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
+
+/** What the GM chooses. Rising starts easy and gets harder. */
+export type DifficultySetting = 'mixed' | 'easy' | 'medium' | 'hard' | 'rising'
+
+export const DIFFICULTY_SETTINGS: { id: DifficultySetting; label: string; hint: string }[] = [
+  { id: 'mixed', label: 'Mixed', hint: 'A bit of everything.' },
+  { id: 'rising', label: 'Rising', hint: 'Starts easy, ends hard.' },
+  { id: 'easy', label: 'Easy', hint: 'Warm up. Great for new players.' },
+  { id: 'medium', label: 'Medium', hint: 'A fair fight.' },
+  { id: 'hard', label: 'Hard', hint: 'For the know-it-alls.' },
+]
 
 export interface ChoiceQuestion extends BaseQuestion {
   type: 'choice' | 'truefalse'
@@ -80,7 +108,14 @@ export interface BluffQuestion extends BaseQuestion {
   decoys: string[]
 }
 
+export interface WouldRatherQuestion extends BaseQuestion {
+  type: 'wouldrather'
+  /** Exactly two choices. */
+  options: [string, string]
+}
+
 export type Question =
+  | WouldRatherQuestion
   | ChoiceQuestion
   | EmojiQuestion
   | PictureQuestion
@@ -97,7 +132,7 @@ export const OPTION_TYPES: QuestionType[] = ['choice', 'truefalse', 'emoji', 'pi
 
 /** Types where a right answer exists and streaks count. */
 export function isGradedType(type: QuestionType) {
-  return type !== 'mostlikely'
+  return type !== 'mostlikely' && type !== 'wouldrather'
 }
 
 // ─── Categories ────────────────────────────────────────────────────────────
@@ -130,6 +165,9 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   words:      { label: 'Words & Language',   emoji: '🔤', group: 'brain' },
   mythology:  { label: 'Mythology',          emoji: '⚱️', group: 'brain' },
   body:       { label: 'Human Body',         emoji: '🫀', group: 'brain' },
+  records:    { label: 'World Records',      emoji: '🏆', group: 'brain' },
+  inventions: { label: 'Inventions',         emoji: '💡', group: 'brain' },
+  dinosaurs:  { label: 'Dinosaurs',          emoji: '🦖', group: 'brain' },
 
   anime:      { label: 'Anime',              emoji: '⛩️', group: 'pop' },
   movies:     { label: 'Movies & TV',        emoji: '🎬', group: 'pop' },
@@ -140,6 +178,8 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   cartoons:   { label: 'Cartoons',           emoji: '📺', group: 'pop' },
   books:      { label: 'Books & Literature', emoji: '📚', group: 'pop' },
   afromusic:  { label: 'African Music',      emoji: '🥁', group: 'pop' },
+  hiphop:     { label: 'Hip-Hop & R&B',      emoji: '🎤', group: 'pop' },
+  series:     { label: 'TV Series',          emoji: '🍿', group: 'pop' },
 
   sports:     { label: 'Sports Mix',         emoji: '🏅', group: 'sports' },
   football:   { label: 'Football',           emoji: '⚽', group: 'sports' },
@@ -157,6 +197,7 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   brands:     { label: 'Brands & Logos',     emoji: '🏷️', group: 'lifestyle' },
   money:      { label: 'Money & Business',   emoji: '💰', group: 'lifestyle' },
   fashion:    { label: 'Fashion',            emoji: '👗', group: 'lifestyle' },
+  nature:     { label: 'Ocean & Nature',     emoji: '🌊', group: 'lifestyle' },
 
   party:      { label: 'Party',              emoji: '🎉', group: null },
 }
@@ -184,6 +225,7 @@ export const GAME_TYPES: Record<QuestionType, GameTypeInfo> = {
   order:      { label: 'Put in Order',       short: 'Put in order',      description: 'Tap four items in the right order.' },
   mostlikely: { label: 'Most Likely To',     short: 'Vote a player',     description: 'Vote for a player. Side with the room.', party: true },
   bluff:      { label: 'Bluff',              short: 'Write a fake',      description: 'Write a fake answer, then find the real one.', party: true },
+  wouldrather: { label: 'Would You Rather', short: 'Pick a side',       description: 'Two choices. Side with the room to score.', party: true },
 }
 
 export const ALL_TYPES = Object.keys(GAME_TYPES) as QuestionType[]
@@ -195,6 +237,7 @@ export interface GameSettings {
   types: QuestionType[]
   timer: number
   questionCount: number
+  difficulty?: DifficultySetting
 }
 
 export const TIMER_OPTIONS = [10, 20, 30]
@@ -210,6 +253,7 @@ export interface PublicQuestion {
   question: string
   points: number
   speedBonus: number
+  difficulty?: Difficulty
   options?: string[]
   emoji?: string
   image?: string

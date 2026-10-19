@@ -237,9 +237,11 @@ export function gradeRound(input: {
       break
     }
 
-    case 'mostlikely': {
-      const options = data.players ?? []
-      reveal.options = options.map((p) => p.name)
+    case 'mostlikely':
+    case 'wouldrather': {
+      // Vote modes: no right answer, siding with the majority scores.
+      const options = q.type === 'wouldrather' ? q.options : (data.players ?? []).map((p) => p.name)
+      reveal.options = options
       const counts = options.map(() => 0)
       for (const a of answers) {
         const i = a.payload.option_index ?? -1

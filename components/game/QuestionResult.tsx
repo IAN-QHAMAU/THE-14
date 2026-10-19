@@ -56,7 +56,7 @@ export function QuestionResult({ state, onReact }: Props) {
               <span className="font-mono">{r?.points ? `+${r.points}` : '+0'}</span>
               {r?.streakBonus ? <span>🔥 {r.streak} in a row, +{r.streakBonus}</span> : null}
               {r?.tooFast && r.correct === false ? <span>Too fast</span> : null}
-              {r?.timeMs != null && reveal.type !== 'mostlikely' && reveal.type !== 'bluff' ? <span>{(r.timeMs / 1000).toFixed(1)}s</span> : null}
+              {r?.timeMs != null && reveal.type !== 'mostlikely' && reveal.type !== 'wouldrather' && reveal.type !== 'bluff' ? <span>{(r.timeMs / 1000).toFixed(1)}s</span> : null}
             </div>
           </div>
         </section>
