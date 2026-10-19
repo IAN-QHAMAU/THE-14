@@ -9,7 +9,6 @@ import { Standings } from '@/components/game/Standings'
 import { Podium } from '@/components/game/Podium'
 import { ShareCard } from '@/components/game/ShareCard'
 import { PromptExtras } from '@/components/game/answers'
-import { DifficultyBadge } from '@/components/game/DifficultyBadge'
 import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
 import { useState } from 'react'
 import { useServerNow } from '@/lib/clock'
@@ -139,8 +138,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         <span>
           {q.category === 'party' ? '🎉' : cat.emoji} {q.category === 'party' ? type.label : cat.label} · Question {round.round_number} of {game.total_questions}
         </span>
-        <span className="flex items-center gap-2">
-          <DifficultyBadge level={q.difficulty} dark />
+        <span>
           {isWrite ? 'Write a fake answer' : isVote ? 'Find the real answer' : type.short}
         </span>
       </div>
