@@ -4,7 +4,6 @@ import { CATEGORIES, GAME_TYPES, type PublicQuestion } from '@/lib/game/question
 import { useServerNow } from '@/lib/clock'
 import { sound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
-import { DifficultyBadge } from '@/components/game/DifficultyBadge'
 
 interface Props {
   question: PublicQuestion
@@ -43,12 +42,6 @@ export function GetReady({ question, number, total, startsAt, size = 'phone', la
         <p className={cn('text-stone-400', stage ? 'text-lg' : 'text-sm')}>
           {question.category === 'party' ? type.description : `${cat.emoji} ${cat.label}`}
         </p>
-        {question.difficulty && (
-          <div className="pt-1">
-            <DifficultyBadge level={question.difficulty} dark className={stage ? 'text-sm px-3 py-1' : ''} />
-            <span className={cn('ml-2 text-stone-500', stage ? 'text-base' : 'text-xs')}>{question.points} points</span>
-          </div>
-        )}
       </div>
 
       <div className={cn('flex items-center justify-center', stage ? 'h-40' : 'h-28')}>

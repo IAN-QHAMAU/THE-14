@@ -11,6 +11,7 @@ import {
   PICKABLE_CATEGORIES,
   TIMER_OPTIONS,
   buildPool,
+  maxGameLength,
   difficultyOf,
   DIFFICULTY_SETTINGS,
   countQuestions,
@@ -29,8 +30,9 @@ export const DEFAULT_SETTINGS: GameSettings = {
   difficulty: 'mixed',
 }
 
+/** How long a game these settings can make (a chosen level is strict). */
 export function poolSize(settings: GameSettings) {
-  return buildPool(settings).length
+  return maxGameLength(settings)
 }
 
 interface Props {
@@ -58,7 +60,7 @@ function Chip({ active, onClick, children, className }: { active: boolean; onCli
 export function GameSetup({ settings, onChange }: Props) {
   const [group, setGroup] = useState<CategoryGroup>('brain')
   const poolList = useMemo(() => buildPool(settings), [settings])
-  const pool = poolList.length
+  const pool = useMemo(() => poolSize(settings), [settings])
   const levels = useMemo(() => {
     const c = { easy: 0, medium: 0, hard: 0 }
     for (const q of poolList) if (!GAME_TYPES[q.type].party) c[difficultyOf(q)]++
@@ -198,7 +200,8 @@ export function GameSetup({ settings, onChange }: Props) {
           })}
         </div>
         <p className="text-xs text-stone-500">
-          {DIFFICULTY_SETTINGS.find((d) => d.id === (settings.difficulty ?? 'mixed'))?.hint} Your picks have {levels.easy} easy, {levels.medium} medium and {levels.hard} hard questions. Harder questions score more.
+          {DIFFICULTY_SETTINGS.find((d) => d.id === (settings.difficulty ?? 'mixed'))?.hint} Your picks have {levels.easy} easy, {levels.medium} medium and {levels.hard} hard questions.
+          {['easy', 'medium', 'hard'].includes(settings.difficulty ?? 'mixed') && ' Only that level is used, so add categories if the game comes out short.'}
         </p>
       </section>
 
@@ -222,7 +225,7 @@ export function GameSetup({ settings, onChange }: Props) {
           <p className="text-xs text-stone-500">
             {pool < MIN_QUESTIONS
               ? 'Not enough questions. Add a category or game type.'
-              : `${pool} questions match this setup.`}
+              : `Up to ${pool} questions with this setup.`}
           </p>
         </div>
 

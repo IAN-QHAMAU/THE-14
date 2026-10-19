@@ -17,9 +17,9 @@ export type Category =
   | 'records' | 'inventions' | 'dinosaurs'
   // Pop culture
   | 'anime' | 'movies' | 'music' | 'gaming' | 'internet' | 'heroes' | 'cartoons' | 'books' | 'afromusic'
-  | 'hiphop' | 'series'
+  | 'hiphop' | 'series' | 'disney' | 'throwback' | 'mystery'
   // Sports
-  | 'sports' | 'football' | 'basketball' | 'motorsport' | 'olympics' | 'racket'
+  | 'sports' | 'football' | 'basketball' | 'motorsport' | 'olympics' | 'racket' | 'wrestling'
   // Kenya & Africa
   | 'kenya' | 'africa'
   // Lifestyle
@@ -180,6 +180,9 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   afromusic:  { label: 'African Music',      emoji: '🥁', group: 'pop' },
   hiphop:     { label: 'Hip-Hop & R&B',      emoji: '🎤', group: 'pop' },
   series:     { label: 'TV Series',          emoji: '🍿', group: 'pop' },
+  disney:     { label: 'Disney & Pixar',     emoji: '🏰', group: 'pop' },
+  throwback:  { label: '2000s Throwback',    emoji: '📼', group: 'pop' },
+  mystery:    { label: 'Mysteries & Detectives', emoji: '🔍', group: 'pop' },
 
   sports:     { label: 'Sports Mix',         emoji: '🏅', group: 'sports' },
   football:   { label: 'Football',           emoji: '⚽', group: 'sports' },
@@ -187,6 +190,7 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   motorsport: { label: 'Motorsport',         emoji: '🏎️', group: 'sports' },
   olympics:   { label: 'Athletics & Olympics', emoji: '🏃', group: 'sports' },
   racket:     { label: 'Tennis, Rugby & Cricket', emoji: '🎾', group: 'sports' },
+  wrestling:  { label: 'Wrestling',          emoji: '🤼', group: 'sports' },
 
   kenya:      { label: 'Kenya',              emoji: '🇰🇪', group: 'local' },
   africa:     { label: 'Africa',             emoji: '🌍', group: 'local' },
@@ -257,7 +261,6 @@ export interface PublicQuestion {
   question: string
   points: number
   speedBonus: number
-  difficulty?: Difficulty
   options?: string[]
   emoji?: string
   image?: string
