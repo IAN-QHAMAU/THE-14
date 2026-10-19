@@ -91,7 +91,7 @@ export function RevealBoard({ reveal, question, players, myPlayerId, myChoice, s
 
   // ── Option based: choice, true/false, emoji, picture, most likely, bluff ─
   const options = reveal.options.length ? reveal.options : question.options ?? []
-  const isMostLikely = reveal.type === 'mostlikely'
+  const isMostLikely = reveal.type === 'mostlikely' || reveal.type === 'wouldrather'
   const winners = reveal.correct_indices
 
   return (
@@ -113,7 +113,7 @@ export function RevealBoard({ reveal, question, players, myPlayerId, myChoice, s
           <p className={cn('text-center', strong, stage ? 'text-3xl font-light' : 'text-lg')}>
             {winners.map((i) => options[i]).join(' & ')}
           </p>
-          <p className={cn('text-xs uppercase tracking-widest', muted)}>The room has spoken</p>
+          <p className={cn('text-xs uppercase tracking-widest', muted)}>{reveal.type === 'wouldrather' ? 'The room would rather' : 'The room has spoken'}</p>
         </div>
       )}
 

@@ -5,6 +5,8 @@ import { useGameState } from '@/lib/hooks/useGameState'
 import { Button } from '@/components/ui/Button'
 import { AvatarDisplay } from '@/components/ui/Avatar'
 import { SoundToggle } from '@/components/ui/SoundToggle'
+import { VoiceHeaderButton, useSpeaking } from '@/components/voice/Voice'
+import { VoiceProvider } from '@/lib/voice/VoiceProvider'
 import { HostStage } from '@/components/gm/HostStage'
 import { DEFAULT_SETTINGS, GameSetup, poolSize } from '@/components/gm/GameSetup'
 import { ReactionLayer, useReactions } from '@/components/game/Reactions'
@@ -42,6 +44,7 @@ function loadSettings(): GameSettings {
       types: (s.types ?? []).filter((t) => ALL_TYPES.includes(t)),
       timer: s.timer ?? 20,
       questionCount: s.questionCount ?? 12,
+      difficulty: s.difficulty ?? 'mixed',
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -277,7 +280,7 @@ export default function GMControlPage() {
             return (
               <div key={p.id} className={cn('group flex items-center gap-2.5 py-2 px-2.5 rounded-xl bg-stone-800/60', !p.is_connected && 'opacity-60')}>
                 <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', p.is_connected ? 'bg-emerald-500' : 'bg-stone-600')} />
-                <AvatarDisplay avatarId={p.avatar} size="xs" />
+                <PlayerVoice playerId={p.id} avatar={p.avatar} />
                 <span className="text-sm text-stone-200 flex-1 truncate">
                   {p.name}
                   {!p.is_connected && <span className="ml-1.5 text-xs text-stone-500">away</span>}
@@ -305,47 +308,59 @@ export default function GMControlPage() {
     </div>
   )
 
+  const voiceQuiet = game.settings?.voiceQuiet !== false
   return (
+    <VoiceProvider
+      gameId={game.id}
+      me={state.myPlayer ? { id: state.myPlayer.id, name: 'Host', avatar: state.myPlayer.avatar } : null}
+      isHost
+      // The host never sees answers early, so they can keep talking (and read questions out).
+      quiet={false}
+      quietDuringQuestions={voiceQuiet}
+      callLink={game.settings?.callLink}
+    >
     <main className="min-h-[100dvh] bg-stone-900 text-stone-50 flex flex-col">
       <ReactionLayer items={items} showNames />
 
       {/* Top bar */}
-      <header className="flex items-center justify-between px-4 md:px-8 py-4 border-b border-stone-800">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-lg font-medium">THE 14</h1>
-          <span className="text-xs text-stone-500 uppercase tracking-widest">{STATUS_LABEL[game.status] ?? game.status}</span>
-        </div>
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between gap-2 px-4 md:px-8 py-3 md:py-4 border-b border-stone-800">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="text-lg font-medium whitespace-nowrap">THE 14</h1>
+          <span className="hidden sm:inline text-xs text-stone-500 uppercase tracking-widest">{STATUS_LABEL[game.status] ?? game.status}</span>
           {game.status !== 'waiting' && <span className="font-mono text-sm tracking-widest text-stone-400">{game.game_code}</span>}
+        </div>
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
           {game.status !== 'finished' && (
             <button
               type="button"
               onClick={() => void newGame()}
               disabled={loading === 'new_game'}
-              className="text-xs text-stone-400 rounded-full border border-stone-700 px-3 py-1 hover:text-stone-200 hover:border-stone-500 disabled:opacity-50"
+              className="text-xs text-stone-400 rounded-full border border-stone-700 px-2.5 sm:px-3 py-1 whitespace-nowrap hover:text-stone-200 hover:border-stone-500 disabled:opacity-50"
             >
               New game
             </button>
           )}
+          <VoiceHeaderButton onSaveSettings={(v) => void control('voice_settings', v)} />
           <SoundToggle dark />
           <button
             type="button"
             onClick={() => setPanelOpen((o) => !o)}
-            className="lg:hidden text-xs text-stone-400 rounded-full border border-stone-700 px-3 py-1"
+            aria-label={panelOpen ? 'Hide players' : 'Show players'}
+            className="lg:hidden text-xs text-stone-400 rounded-full border border-stone-700 px-2.5 py-1 whitespace-nowrap"
           >
-            {panelOpen ? 'Hide players' : `Players ${realPlayers.length}`}
+            {panelOpen ? 'Hide' : `👥 ${realPlayers.length}`}
           </button>
         </div>
       </header>
 
-      <div className="flex-1 grid lg:grid-cols-[1fr_360px] lg:items-start">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         {/* Stage */}
-        <section className="px-4 md:px-10 py-8 md:py-12 flex flex-col items-center justify-center min-h-[50vh] lg:sticky lg:top-0 lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto">
+        <section className="min-w-0 px-4 md:px-10 py-6 md:py-12 flex flex-col items-center justify-center min-h-[50vh] lg:sticky lg:top-0 lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto">
           <HostStage state={state} joinUrl={joinUrl} />
         </section>
 
         {/* Side panel */}
-        <aside className={cn('border-t lg:border-t-0 lg:border-l border-stone-800 px-4 py-6 space-y-8 lg:block lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto', panelOpen || game.status === 'waiting' ? 'block' : 'hidden')}>
+        <aside className={cn('min-w-0 border-t lg:border-t-0 lg:border-l border-stone-800 px-4 py-6 space-y-8 lg:block lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto', panelOpen || game.status === 'waiting' ? 'block' : 'hidden')}>
           {game.status === 'waiting' ? (
             <>
               <GameSetup settings={settings} onChange={updateSettings} />
@@ -396,10 +411,11 @@ export default function GMControlPage() {
             <span className="text-xs text-stone-500 tabular-nums">Next in {Math.max(1, Math.ceil((autoAt - now) / 1000))}s</span>
           )}
           <div className="flex-1 text-right text-sm text-rose-400 truncate">{error}</div>
+          <div className="flex gap-2 w-full sm:w-auto">
           {secondary && (
             <Button
               variant="secondary"
-              className="bg-transparent border-stone-700 text-stone-200 hover:bg-stone-800"
+              className="flex-1 sm:flex-none bg-transparent border-stone-700 text-stone-200 hover:bg-stone-800"
               loading={loading === secondary.action}
               onClick={() => {
                 if (secondary!.action === 'play_again') {
@@ -413,7 +429,7 @@ export default function GMControlPage() {
           )}
           {primary && (
             <Button
-              className="bg-stone-50 text-stone-900 hover:bg-stone-200 min-w-[10rem]"
+              className="flex-[2] sm:flex-none bg-stone-50 text-stone-900 hover:bg-stone-200 sm:min-w-[10rem]"
               loading={loading === primary.action}
               disabled={primary.disabled}
               onClick={() => {
@@ -424,9 +440,11 @@ export default function GMControlPage() {
               {primary.label}
             </Button>
           )}
+          </div>
         </div>
       </footer>
     </main>
+    </VoiceProvider>
   )
 }
 
@@ -438,5 +456,21 @@ function Switch({ on, onClick, label }: { on: boolean; onClick: () => void; labe
       </span>
       {label}
     </button>
+  )
+}
+
+/** Avatar with a speaking ring and a small mic dot for players in voice. */
+function PlayerVoice({ playerId, avatar }: { playerId: string; avatar: string }) {
+  const { inVoice, talking, muted } = useSpeaking(playerId)
+  return (
+    <span className="relative flex-shrink-0">
+      <AvatarDisplay avatarId={avatar} size="xs" className={cn(talking && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-stone-800')} />
+      {inVoice && (
+        <span
+          className={cn('absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-stone-800', muted ? 'bg-stone-500' : 'bg-emerald-500')}
+          title={muted ? 'In voice, muted' : 'In voice'}
+        />
+      )}
+    </span>
   )
 }

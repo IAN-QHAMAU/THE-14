@@ -11,6 +11,9 @@ import { Podium } from '@/components/game/Podium'
 import { ShareCard } from '@/components/game/ShareCard'
 import { ReactionBar, ReactionLayer, useReactions } from '@/components/game/Reactions'
 import { SoundToggle } from '@/components/ui/SoundToggle'
+import { VoiceFab } from '@/components/voice/Voice'
+import { VoiceProvider, isQuestionLive } from '@/lib/voice/VoiceProvider'
+import { useServerNow } from '@/lib/clock'
 
 function Dark({ children }: { children: React.ReactNode }) {
   return (
@@ -33,6 +36,7 @@ export default function RoomPage() {
     [state?.myPlayer],
   )
   const { items, send } = useReactions(state?.game.id, me)
+  const now = useServerNow(500)
 
   async function handleSubmit(body: SubmitBody) {
     try {
@@ -72,96 +76,115 @@ export default function RoomPage() {
     return null
   }
 
-  const { game, myPlayer } = state
+  const voiceMe = state.myPlayer ? { id: state.myPlayer.id, name: state.myPlayer.name, avatar: state.myPlayer.avatar } : null
+  const voiceQuiet = state.game.settings?.voiceQuiet !== false
+  const questionLive = isQuestionLive(state.game, state.currentRound, now)
 
-  if (game.status === 'waiting') {
-    return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} />
-  }
+  const screen = (): React.ReactNode => {
+    const { game, myPlayer } = state
 
-  // The host closed this lobby before it started (usually for a new game).
-  if (game.status === 'finished' && game.total_questions === 0) {
-    return (
-      <Dark>
-        <div className="text-center space-y-4 animate-fade-up">
-          <h1 className="text-2xl font-light">The host started a new game</h1>
-          <p className="text-sm text-stone-400">Ask the host for the new code, or open their invite link.</p>
-          <button
-            type="button"
-            onClick={toJoin}
-            className="mt-2 rounded-xl bg-stone-50 text-stone-900 px-6 py-3 text-sm font-medium"
-          >
-            Join a game
-          </button>
-        </div>
-      </Dark>
-    )
-  }
+    if (game.status === 'waiting') {
+      return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} />
+    }
 
-  if (game.status === 'finished') {
-    const meEntry = state.scores.find((s) => s.player_id === myPlayer?.id)
-    return (
-      <Dark>
-        <ReactionLayer items={items} />
-        <Podium scores={state.scores} awards={state.awards} tags={state.tags} myPlayerId={myPlayer?.id}>
-          <div className="space-y-6">
-            <ReactionBar onSend={send} dark />
-            {meEntry && (
-              <ShareCard mode="player" me={meEntry} scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
-            )}
-            <button type="button" onClick={toJoin} className="w-full text-xs text-stone-500 underline underline-offset-4 hover:text-stone-300">
-              Join another game
+    // The host closed this lobby before it started (usually for a new game).
+    if (game.status === 'finished' && game.total_questions === 0) {
+      return (
+        <Dark>
+          <div className="text-center space-y-4 animate-fade-up">
+            <h1 className="text-2xl font-light">The host started a new game</h1>
+            <p className="text-sm text-stone-400">Ask the host for the new code, or open their invite link.</p>
+            <button
+              type="button"
+              onClick={toJoin}
+              className="mt-2 rounded-xl bg-stone-50 text-stone-900 px-6 py-3 text-sm font-medium"
+            >
+              Join a game
             </button>
           </div>
-        </Podium>
-      </Dark>
-    )
-  }
+        </Dark>
+      )
+    }
 
-  if (game.status === 'question_result' && state.reveal) {
-    return (
-      <>
-        <ReactionLayer items={items} />
-        <QuestionResult state={state} onReact={send} />
-      </>
-    )
-  }
+    if (game.status === 'finished') {
+      const meEntry = state.scores.find((s) => s.player_id === myPlayer?.id)
+      return (
+        <Dark>
+          <ReactionLayer items={items} />
+          <Podium scores={state.scores} awards={state.awards} tags={state.tags} myPlayerId={myPlayer?.id}>
+            <div className="space-y-6">
+              <ReactionBar onSend={send} dark />
+              {meEntry && (
+                <ShareCard mode="player" me={meEntry} scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
+              )}
+              <button type="button" onClick={toJoin} className="w-full text-xs text-stone-500 underline underline-offset-4 hover:text-stone-300">
+                Join another game
+              </button>
+            </div>
+          </Podium>
+        </Dark>
+      )
+    }
 
-  if (game.status === 'leaderboard') {
+    if (game.status === 'question_result' && state.reveal) {
+      return (
+        <>
+          <ReactionLayer items={items} />
+          <QuestionResult state={state} onReact={send} />
+        </>
+      )
+    }
+
+    if (game.status === 'leaderboard') {
+      return (
+        <Dark>
+          <ReactionLayer items={items} />
+          <div className="space-y-8">
+            <Standings
+              scores={state.scores}
+              lastReveal={state.lastReveal}
+              myPlayerId={myPlayer?.id}
+              subtitle={`After question ${game.current_round} of ${game.total_questions}`}
+            />
+            <ReactionBar onSend={send} dark />
+          </div>
+        </Dark>
+      )
+    }
+
+    if (game.status === 'active' && state.currentRound && state.currentQuestion) {
+      // A fresh screen for every question and every Bluff phase, so nothing
+      // from the previous one (like a selected answer) can carry over.
+      const phaseKey = `${state.currentRound.id}:${state.currentRound.data?.phase ?? 'answer'}`
+      return <QuestionScreen key={phaseKey} state={state} onSubmit={handleSubmit} />
+    }
+
+    if (game.status === 'category') {
+      return (
+        <Dark>
+          <GameIntro game={game} />
+        </Dark>
+      )
+    }
+
+    // Brief in-between moments while the next screen loads.
     return (
       <Dark>
-        <ReactionLayer items={items} />
-        <div className="space-y-8">
-          <Standings
-            scores={state.scores}
-            lastReveal={state.lastReveal}
-            myPlayerId={myPlayer?.id}
-            subtitle={`After question ${game.current_round} of ${game.total_questions}`}
-          />
-          <ReactionBar onSend={send} dark />
-        </div>
+        <p className="text-center text-sm text-stone-500 animate-pulse">One moment.</p>
       </Dark>
     )
   }
 
-  if (game.status === 'active' && state.currentRound && state.currentQuestion) {
-    // A fresh screen for every question and every Bluff phase, so nothing
-    // from the previous one (like a selected answer) can carry over.
-    const phaseKey = `${state.currentRound.id}:${state.currentRound.data?.phase ?? 'answer'}`
-    return <QuestionScreen key={phaseKey} state={state} onSubmit={handleSubmit} />
-  }
-
-  if (game.status === 'category') {
-    return (
-      <Dark>
-        <GameIntro game={game} />
-      </Dark>
-    )
-  }
-
-  // Brief in-between moments while the next screen loads.
   return (
-    <Dark>
-      <p className="text-center text-sm text-stone-500 animate-pulse">One moment.</p>
-    </Dark>
+    <VoiceProvider
+      gameId={state.game.id}
+      me={voiceMe}
+      quiet={voiceQuiet && questionLive}
+      quietDuringQuestions={voiceQuiet}
+      callLink={state.game.settings?.callLink}
+    >
+      {screen()}
+      <VoiceFab />
+    </VoiceProvider>
   )
 }

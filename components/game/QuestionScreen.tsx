@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
 import { TimerBar } from '@/components/ui/Countdown'
 import { SoundToggle } from '@/components/ui/SoundToggle'
+import { DifficultyBadge } from '@/components/game/DifficultyBadge'
 import { GetReady } from '@/components/game/GetReady'
 import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PlayerVote, PromptExtras } from '@/components/game/answers'
 import { serverNow, useServerNow } from '@/lib/clock'
@@ -176,7 +177,10 @@ export function QuestionScreen({ state, onSubmit }: Props) {
               {round.round_number} / {game.total_questions} · {isVote ? 'Find the real answer' : type.short}
             </span>
           </div>
-          <SoundToggle />
+          <div className="flex items-center gap-2">
+            <DifficultyBadge level={q.difficulty} />
+            <SoundToggle />
+          </div>
         </header>
 
         <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} ticking={!done} />

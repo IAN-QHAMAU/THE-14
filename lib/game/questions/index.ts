@@ -1,10 +1,14 @@
 import { CLASSIC_QUESTIONS } from './classic'
 import { MORE_QUESTIONS } from './more'
 import { EXTRA_QUESTIONS, EXTRA_TRUE_FALSE, EXTRA_CLOSEST, EXTRA_ORDER } from './extra'
+import { BONUS_QUESTIONS, BONUS_BLUFF, BONUS_MOST_LIKELY, WOULD_RATHER } from './bonus'
 import { TRUE_FALSE, EMOJI, PICTURE, CLOSEST, ORDER, MOST_LIKELY, BLUFF } from './special'
 import {
   CATEGORIES,
   GAME_TYPES,
+  difficultyOf,
+  type Difficulty,
+  type DifficultySetting,
   type Category,
   type GameSettings,
   type Question,
@@ -27,6 +31,10 @@ export const ALL_QUESTIONS: Question[] = [
   ...EXTRA_TRUE_FALSE,
   ...EXTRA_CLOSEST,
   ...EXTRA_ORDER,
+  ...BONUS_QUESTIONS.map(normalize),
+  ...BONUS_BLUFF,
+  ...BONUS_MOST_LIKELY,
+  ...WOULD_RATHER,
   ...TRUE_FALSE,
   ...EMOJI,
   ...PICTURE,
@@ -90,11 +98,18 @@ export function seededRandom(seed: string): () => number {
  * be avoided.
  */
 export function pickQuestions(settings: GameSettings): Question[] {
-  const pool = shuffle(buildPool(settings))
+  const level = settings.difficulty ?? 'mixed'
+  if (level === 'rising') return pickRising(settings)
+  // Preferred level first, then the nearest level as top up.
+  const order = TIER[level]
+  const tier = (q: Question) => (GAME_TYPES[q.type].party ? 0 : order[difficultyOf(q)])
+  const pool = shuffle(buildPool(settings)).sort((a, b) => tier(a) - tier(b))
   const count = Math.min(settings.questionCount, pool.length)
 
+  // Buckets are popped from the end, so store them best first, reversed.
   const buckets = new Map<QuestionType, Question[]>()
   for (const q of pool) buckets.set(q.type, [...(buckets.get(q.type) ?? []), q])
+  for (const [t, list] of buckets) buckets.set(t, list.reverse())
 
   const quizTypes = [...buckets.keys()].filter((t) => !GAME_TYPES[t].party)
   const partyTypes = [...buckets.keys()].filter((t) => GAME_TYPES[t].party)
@@ -104,22 +119,78 @@ export function pickQuestions(settings: GameSettings): Question[] {
   let partyPicked = 0
   // Weighted round robin: Classic takes two per lap, everything else one.
   const lap = [...quizTypes.flatMap((t) => (t === 'choice' ? [t, t] : [t])), ...partyTypes]
-  while (picked.length < count) {
-    let progressed = false
-    for (const t of lap) {
-      if (picked.length >= count) break
-      const isParty = GAME_TYPES[t].party
-      if (isParty && partyPicked >= partyCap) continue
-      const next = buckets.get(t)?.pop()
-      if (!next) continue
-      picked.push(next)
-      if (isParty) partyPicked++
-      progressed = true
+  // Fill in passes: first only the chosen level, then the nearest levels, so
+  // a type with no hard questions cannot water down a Hard game.
+  for (let pass = 0; pass <= 2 && picked.length < count; pass++) {
+    let progressed = true
+    while (picked.length < count && progressed) {
+      progressed = false
+      for (const t of lap) {
+        if (picked.length >= count) break
+        const isParty = GAME_TYPES[t].party
+        if (isParty && partyPicked >= partyCap) continue
+        const list = buckets.get(t)
+        const next = list?.[list.length - 1]
+        if (!next || tier(next) > pass) continue
+        list!.pop()
+        picked.push(next)
+        if (isParty) partyPicked++
+        progressed = true
+      }
     }
-    if (!progressed) break
   }
 
-  // Spread types out: greedy pick avoiding the previous two types.
+  return spreadTypes(picked)
+}
+
+const TIER: Record<string, Record<Difficulty, number>> = {
+  mixed: { easy: 0, medium: 0, hard: 0 },
+  rising: { easy: 0, medium: 0, hard: 0 },
+  easy: { easy: 0, medium: 1, hard: 2 },
+  medium: { medium: 0, easy: 1, hard: 1 },
+  hard: { hard: 0, medium: 1, easy: 2 },
+}
+
+/** Roughly a third each of easy, medium and hard, then ordered easy to hard. */
+function pickRising(settings: GameSettings): Question[] {
+  const n = settings.questionCount
+  const party = settings.types.filter((t) => GAME_TYPES[t].party)
+  const quiz = settings.types.filter((t) => !GAME_TYPES[t].party)
+  const sizes = [Math.ceil(n / 3), Math.ceil(n / 3), n - 2 * Math.ceil(n / 3)]
+  const levels: DifficultySetting[] = ['easy', 'medium', 'hard']
+  const seen = new Set<string>()
+  const picked: Question[] = []
+  levels.forEach((difficulty, i) => {
+    // Party rounds only in the middle stretch.
+    const types = i === 1 || !quiz.length ? settings.types : quiz
+    for (const q of pickQuestions({ ...settings, types, difficulty, questionCount: sizes[i] })) {
+      if (!seen.has(q.id)) {
+        seen.add(q.id)
+        picked.push(q)
+      }
+    }
+  })
+  if (picked.length < n) {
+    for (const q of pickQuestions({ ...settings, difficulty: 'mixed', questionCount: n * 2 })) {
+      if (picked.length >= n) break
+      if (!seen.has(q.id) && (party.includes(q.type) ? false : true)) {
+        seen.add(q.id)
+        picked.push(q)
+      }
+    }
+  }
+  return riseInDifficulty(picked.slice(0, n))
+}
+
+/** Easy first, hard last. Party rounds sit in the middle stretch. */
+function riseInDifficulty(picked: Question[]): Question[] {
+  const rank = (q: Question) => (GAME_TYPES[q.type].party ? 1 : { easy: 0, medium: 1, hard: 2 }[difficultyOf(q)])
+  const groups = [0, 1, 2].map((r) => picked.filter((q) => rank(q) === r))
+  return groups.flatMap((g, i) => spreadTypes(g, i === 0))
+}
+
+/** Spread types out: greedy pick avoiding the same type three times running. */
+function spreadTypes(picked: Question[], quizFirst = true): Question[] {
   const remaining = shuffle(picked)
   const ordered: Question[] = []
   while (remaining.length) {
@@ -133,7 +204,7 @@ export function pickQuestions(settings: GameSettings): Question[] {
     )
     if (idx < 0) idx = 0
     // Do not open the game with a party round.
-    if (ordered.length === 0) {
+    if (ordered.length === 0 && quizFirst) {
       const firstQuiz = remaining.findIndex((q) => !GAME_TYPES[q.type].party)
       if (firstQuiz >= 0) idx = firstQuiz
     }
@@ -163,6 +234,7 @@ export function toPublicQuestion(q: Question, roundData?: RoundData): PublicQues
     question: q.question,
     points: q.points,
     speedBonus: q.speedBonus,
+    difficulty: GAME_TYPES[q.type].party ? undefined : difficultyOf(q),
   }
   switch (q.type) {
     case 'choice':
@@ -180,6 +252,8 @@ export function toPublicQuestion(q: Question, roundData?: RoundData): PublicQues
     }
     case 'mostlikely':
       return { ...base, options: (roundData?.players ?? []).map((p) => p.name) }
+    case 'wouldrather':
+      return { ...base, options: q.options }
     case 'bluff':
       return { ...base, options: roundData?.options ?? [] }
   }
