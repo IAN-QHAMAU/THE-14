@@ -5,6 +5,8 @@ import { useGameState } from '@/lib/hooks/useGameState'
 import { Button } from '@/components/ui/Button'
 import { AvatarDisplay } from '@/components/ui/Avatar'
 import { SoundToggle } from '@/components/ui/SoundToggle'
+import { VoiceHeaderButton, useSpeaking } from '@/components/voice/Voice'
+import { VoiceProvider } from '@/lib/voice/VoiceProvider'
 import { HostStage } from '@/components/gm/HostStage'
 import { DEFAULT_SETTINGS, GameSetup, poolSize } from '@/components/gm/GameSetup'
 import { ReactionLayer, useReactions } from '@/components/game/Reactions'
@@ -278,7 +280,7 @@ export default function GMControlPage() {
             return (
               <div key={p.id} className={cn('group flex items-center gap-2.5 py-2 px-2.5 rounded-xl bg-stone-800/60', !p.is_connected && 'opacity-60')}>
                 <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', p.is_connected ? 'bg-emerald-500' : 'bg-stone-600')} />
-                <AvatarDisplay avatarId={p.avatar} size="xs" />
+                <PlayerVoice playerId={p.id} avatar={p.avatar} />
                 <span className="text-sm text-stone-200 flex-1 truncate">
                   {p.name}
                   {!p.is_connected && <span className="ml-1.5 text-xs text-stone-500">away</span>}
@@ -306,7 +308,17 @@ export default function GMControlPage() {
     </div>
   )
 
+  const voiceQuiet = game.settings?.voiceQuiet !== false
   return (
+    <VoiceProvider
+      gameId={game.id}
+      me={state.myPlayer ? { id: state.myPlayer.id, name: 'Host', avatar: state.myPlayer.avatar } : null}
+      isHost
+      // The host never sees answers early, so they can keep talking (and read questions out).
+      quiet={false}
+      quietDuringQuestions={voiceQuiet}
+      callLink={game.settings?.callLink}
+    >
     <main className="min-h-[100dvh] bg-stone-900 text-stone-50 flex flex-col">
       <ReactionLayer items={items} showNames />
 
@@ -328,6 +340,7 @@ export default function GMControlPage() {
               New game
             </button>
           )}
+          <VoiceHeaderButton onSaveSettings={(v) => void control('voice_settings', v)} />
           <SoundToggle dark />
           <button
             type="button"
@@ -431,6 +444,7 @@ export default function GMControlPage() {
         </div>
       </footer>
     </main>
+    </VoiceProvider>
   )
 }
 
@@ -442,5 +456,21 @@ function Switch({ on, onClick, label }: { on: boolean; onClick: () => void; labe
       </span>
       {label}
     </button>
+  )
+}
+
+/** Avatar with a speaking ring and a small mic dot for players in voice. */
+function PlayerVoice({ playerId, avatar }: { playerId: string; avatar: string }) {
+  const { inVoice, talking, muted } = useSpeaking(playerId)
+  return (
+    <span className="relative flex-shrink-0">
+      <AvatarDisplay avatarId={avatar} size="xs" className={cn(talking && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-stone-800')} />
+      {inVoice && (
+        <span
+          className={cn('absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-stone-800', muted ? 'bg-stone-500' : 'bg-emerald-500')}
+          title={muted ? 'In voice, muted' : 'In voice'}
+        />
+      )}
+    </span>
   )
 }

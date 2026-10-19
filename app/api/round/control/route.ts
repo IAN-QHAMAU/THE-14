@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
       }
       const settings = parseSettings(body.settings)
       if (!settings) return NextResponse.json({ error: 'Pick at least one game type.' }, { status: 400 })
-      const { error } = await setupGame(gameId, settings)
+      // Keep voice settings chosen in the lobby.
+      const { error } = await setupGame(gameId, { ...settings, voiceQuiet: game.settings?.voiceQuiet, callLink: game.settings?.callLink })
       if (error) return NextResponse.json({ error }, { status: 400 })
       return NextResponse.json({ success: true })
     }
@@ -119,6 +120,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Nothing to end.' }, { status: 400 })
       }
       await finishGame(gameId)
+      return NextResponse.json({ success: true })
+    }
+
+    case 'voice_settings': {
+      const next = { ...(game.settings ?? {}) }
+      if (typeof body.voiceQuiet === 'boolean') next.voiceQuiet = body.voiceQuiet
+      if (typeof body.callLink === 'string') {
+        const link = body.callLink.trim().slice(0, 300)
+        if (link && !/^https:\/\/[^\s]+$/i.test(link)) {
+          return NextResponse.json({ error: 'Call link must start with https://' }, { status: 400 })
+        }
+        next.callLink = link || undefined
+      }
+      await createServerSupabase().from('games').update({ settings: next }).eq('id', gameId)
       return NextResponse.json({ success: true })
     }
 

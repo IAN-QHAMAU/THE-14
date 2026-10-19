@@ -238,6 +238,10 @@ export interface GameSettings {
   timer: number
   questionCount: number
   difficulty?: DifficultySetting
+  /** Voice: mute everyone while a question is live (default on). */
+  voiceQuiet?: boolean
+  /** Voice: backup group call link (WhatsApp, Meet, Discord). */
+  callLink?: string
 }
 
 export const TIMER_OPTIONS = [10, 20, 30]

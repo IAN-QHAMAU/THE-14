@@ -225,6 +225,19 @@ To add a category, add it to the `Category` type and `CATEGORIES` in `schema.ts`
 
 ---
 
+## Voice Chat
+
+Free voice chat for playing with friends who are far away. No account, no keys, no monthly limit.
+
+- Tap **Voice** (bottom right on phones, top bar for the host), then **Join voice**. Up to 8 people.
+- Phones connect straight to each other. The game's Supabase Realtime connection only introduces them; no audio goes through any server.
+- Mute button, speaking rings on avatars, and the host can mute one person or everyone.
+- **Quiet during questions** (on by default) mutes players while a question is live so nobody shouts the answer, then unmutes for the reveal. The host stays unmuted, since they never see answers early.
+- **Backup call link**: the host can paste a WhatsApp, Meet or Discord call link. Everyone then sees a Join call button. Use it for groups bigger than 8, or for anyone whose network blocks direct calls.
+- Earphones give the best sound. On iPhones the mic usually pauses when the screen locks.
+
+If some players often show "can't connect", their network blocks direct connections. You can add a relay (TURN) server with the optional `NEXT_PUBLIC_TURN_*` variables in `.env.local.example`.
+
 ## Install as an App
 
 Installable as a home screen app on mobile. The join page and GM page show a "Get the app" card that adapts to the phone:
