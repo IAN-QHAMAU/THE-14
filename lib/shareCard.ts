@@ -10,6 +10,10 @@ import type { Award, PlayerScoreEntry, PlayerStats, PlayerTag } from '@/types'
 const W = 1080
 const H = 1920
 const PAD = 80
+// Instagram and WhatsApp cover the top and bottom of a story with the
+// profile row, music sticker and reply box, so content stays between these.
+const SAFE_TOP = 250
+const SAFE_BOTTOM = H - 290
 
 const C = {
   bg: '#1c1917',
@@ -142,13 +146,13 @@ function header({ ctx, font }: Ctx) {
   ctx.textAlign = 'left'
   ctx.fillStyle = C.text
   ctx.font = `300 52px ${font}`
-  ctx.fillText('THE 14', PAD, 130)
-  label({ ctx, font }, new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }), W - PAD, 124, 'right')
+  ctx.fillText('THE 14', PAD, SAFE_TOP)
+  label({ ctx, font }, new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }), W - PAD, SAFE_TOP - 6, 'right')
   ctx.strokeStyle = C.line
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(PAD, 170)
-  ctx.lineTo(W - PAD, 170)
+  ctx.moveTo(PAD, SAFE_TOP + 36)
+  ctx.lineTo(W - PAD, SAFE_TOP + 36)
   ctx.stroke()
 }
 
@@ -156,7 +160,7 @@ function footer({ ctx, font }: Ctx) {
   ctx.fillStyle = C.faint
   ctx.font = `400 26px ${font}`
   ctx.textAlign = 'center'
-  ctx.fillText('Kwani me hudoo.', W / 2, H - 70)
+  ctx.fillText('Kwani me hudoo.', W / 2, SAFE_BOTTOM + 60)
 }
 
 interface StandingRow {
@@ -339,15 +343,15 @@ async function playerCard(c: Ctx, input: ShareCardInput) {
   const s = input.stats[me.player_id]
   const accent = accentOf(me.avatar)
 
-  const hero = 200
-  const heroY = 215
-  const nameY = heroY + hero + 66
-  const placeSize = 112
+  const hero = 180
+  const heroY = SAFE_TOP + 85
+  const nameY = heroY + hero + 62
+  const placeSize = 104
   const placeY = nameY + placeSize + 4
-  const pointsY = placeY + 54
-  const chipY = pointsY + 38
-  const tilesY = chipY + 100
-  const tilesH = 122
+  const pointsY = placeY + 52
+  const chipY = pointsY + 36
+  const tilesY = chipY + 96
+  const tilesH = 112
 
   // Thin ring around the avatar.
   ctx.beginPath()
@@ -413,9 +417,9 @@ async function playerCard(c: Ctx, input: ShareCardInput) {
 
   // Podium for the top 3, places 4 to 6 below it, then your own row if lower.
   const all = rankRows(input.scores)
-  const podiumTop = tilesY + tilesH + 70
+  const podiumTop = tilesY + tilesH + 54
   label(c, 'Podium', PAD, podiumTop)
-  const scale = 0.92
+  const scale = 0.88
   // Tallest column: avatar, name, tag and the 1st place block.
   const podiumBase = podiumTop + 30 + Math.round((104 + 100 + 160) * scale)
   await miniPodium(c, all, input.tags, podiumBase, scale, me.player_id, accent)
@@ -423,15 +427,18 @@ async function playerCard(c: Ctx, input: ShareCardInput) {
   const next = all.slice(3, 6)
   const mine = all.find((r) => r.entry.player_id === me.player_id)
   const shown = all.slice(0, 6).some((r) => r.entry.player_id === me.player_id)
-  const rows = shown || !mine ? next : [...next, mine]
+  // Only as many rows as fit above the safe area; your own row comes first.
+  const top = podiumBase + 16
+  const fit = Math.max(1, Math.floor((SAFE_BOTTOM - top - 30 - (shown ? 0 : 44)) / 78))
+  const rows = shown || !mine ? next.slice(0, fit) : [...next.slice(0, fit - 1), mine]
   if (rows.length) {
     await standings(c, input, rows, {
-      top: podiumBase + 16,
-      bottom: H - 140,
+      top,
+      bottom: SAFE_BOTTOM,
       title: '',
       highlight: me.player_id,
       accent,
-      dividerBefore: shown ? undefined : next.length,
+      dividerBefore: shown ? undefined : rows.length - 1,
       details: true,
     })
   }
@@ -444,12 +451,12 @@ async function groupCard(c: Ctx, input: ShareCardInput) {
   ctx.textAlign = 'center'
   ctx.fillStyle = C.text
   ctx.font = `300 76px ${font}`
-  ctx.fillText('Final results', W / 2, 285)
-  label(c, `${sorted.length} players`, W / 2, 338, 'center')
+  ctx.fillText('Final results', W / 2, SAFE_TOP + 145)
+  label(c, `${sorted.length} players`, W / 2, SAFE_TOP + 198, 'center')
 
-  await miniPodium(c, rankRows(input.scores), input.tags, 760)
+  await miniPodium(c, rankRows(input.scores), input.tags, SAFE_TOP + 600)
 
-  await standings(c, input, rankRows(input.scores), { top: 850, bottom: H - 150, title: 'Everyone', details: input.scores.length <= 8 })
+  await standings(c, input, rankRows(input.scores), { top: SAFE_TOP + 690, bottom: SAFE_BOTTOM, title: 'Everyone', details: input.scores.length <= 8 })
 }
 
 export async function renderShareCard(input: ShareCardInput): Promise<Blob | null> {
@@ -469,7 +476,7 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob | nul
   if (!ctx) return null
 
   const accent = input.mode === 'player' ? accentOf(input.me?.avatar) : DEFAULT_ACCENT
-  background(ctx, accent, input.mode === 'player' ? 330 : 520)
+  background(ctx, accent, input.mode === 'player' ? SAFE_TOP + 175 : SAFE_TOP + 270)
   const c = { ctx, font }
   header(c)
   if (input.mode === 'player') await playerCard(c, input)
