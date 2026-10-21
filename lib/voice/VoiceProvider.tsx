@@ -13,10 +13,21 @@ interface VoiceContextValue {
   join: () => void
   leave: () => void
   toggleMute: () => void
+  toggleLoudspeaker: () => void
   hostMute: (playerId: string | '*') => void
 }
 
-const IDLE: VoiceState = { status: 'idle', peers: [], speaking: new Set(), muted: false, quieted: false }
+const IDLE: VoiceState = { status: 'idle', peers: [], speaking: new Set(), muted: false, quieted: false, loudspeaker: false }
+
+const LOUD_KEY = 'the14:voice-loudspeaker'
+
+function savedLoudspeaker() {
+  try {
+    return window.localStorage.getItem(LOUD_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 const VoiceContext = createContext<VoiceContextValue | null>(null)
 
@@ -63,6 +74,7 @@ export function VoiceProvider({ gameId, me, isHost = false, quiet, quietDuringQu
         setTimeout(() => setHostMutedMe(false), 4000)
       }
       m.subscribe(setState)
+      m.setLoudspeaker(savedLoudspeaker())
       mesh.current = m
     }
     mesh.current.setQuieted(quiet)
@@ -79,13 +91,21 @@ export function VoiceProvider({ gameId, me, isHost = false, quiet, quietDuringQu
     mesh.current?.setMuted(!mesh.current ? false : !state.muted)
   }, [state.muted])
 
+  const toggleLoudspeaker = useCallback(() => {
+    const on = !state.loudspeaker
+    try {
+      window.localStorage.setItem(LOUD_KEY, on ? '1' : '0')
+    } catch {}
+    mesh.current?.setLoudspeaker(on)
+  }, [state.loudspeaker])
+
   const hostMute = useCallback((playerId: string | '*') => {
     mesh.current?.hostMute(playerId)
   }, [])
 
   const value = useMemo<VoiceContextValue>(
-    () => ({ state, me, isHost, callLink, quietDuringQuestions, hostMutedMe, join, leave, toggleMute, hostMute }),
-    [state, me, isHost, callLink, quietDuringQuestions, hostMutedMe, join, leave, toggleMute, hostMute],
+    () => ({ state, me, isHost, callLink, quietDuringQuestions, hostMutedMe, join, leave, toggleMute, toggleLoudspeaker, hostMute }),
+    [state, me, isHost, callLink, quietDuringQuestions, hostMutedMe, join, leave, toggleMute, toggleLoudspeaker, hostMute],
   )
 
   return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>
