@@ -7,6 +7,9 @@
 
 export const MAX_VOICE = 8
 
+/** How much louder everyone sounds with Loudspeaker on. */
+const LOUD_GAIN = 3.5
+
 export interface PeerInfo {
   id: string
   name: string
@@ -47,6 +50,8 @@ export interface VoiceState {
   muted: boolean
   /** Muted by the game, for example while a question is live. */
   quieted: boolean
+  /** Boost other people's voices so the phone can sit on the table. */
+  loudspeaker: boolean
   error?: string
 }
 
@@ -67,6 +72,8 @@ interface Link {
   audio: HTMLAudioElement
   pendingIce: RTCIceCandidateInit[]
   analyser?: AnalyserNode
+  /** Their voice routed through the loudspeaker boost. */
+  boost?: MediaStreamAudioSourceNode
 }
 
 export class VoiceMesh {
@@ -79,9 +86,10 @@ export class VoiceMesh {
   private linkState = new Map<string, VoicePeerState['link']>()
   private ctx: AudioContext | null = null
   private localAnalyser?: AnalyserNode
+  private loudOut: GainNode | null = null
   private speakTimer: ReturnType<typeof setInterval> | null = null
   private listeners = new Set<(s: VoiceState) => void>()
-  private state: VoiceState = { status: 'idle', peers: [], speaking: new Set(), muted: false, quieted: false }
+  private state: VoiceState = { status: 'idle', peers: [], speaking: new Set(), muted: false, quieted: false, loudspeaker: false }
   /** Called when the host mutes you. */
   onHostMute?: () => void
 
@@ -118,6 +126,7 @@ export class VoiceMesh {
     try {
       this.ctx = new (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
       void this.ctx.resume()
+      this.setupLoudspeaker()
 
       this.transport.onSignal((s) => void this.handleSignal(s))
       this.transport.onPeers((list) => this.syncPeers(list))
@@ -160,6 +169,7 @@ export class VoiceMesh {
     this.transport.close()
     void this.ctx?.close().catch(() => {})
     this.ctx = null
+    this.loudOut = null
     this.peers.clear()
     this.linkState.clear()
     this.emit({ status: 'idle', peers: [], speaking: new Set(), error: undefined })
@@ -177,6 +187,13 @@ export class VoiceMesh {
     this.applyTrackState()
   }
 
+  /** Loudspeaker: play everyone louder through the phone speaker. */
+  setLoudspeaker(on: boolean) {
+    if (on !== this.state.loudspeaker) this.emit({ loudspeaker: on })
+    void this.ctx?.resume().catch(() => {})
+    this.applyLoudspeaker()
+  }
+
   /** Host only: ask one person (or '*' for everyone) to mute. */
   hostMute(target: string) {
     this.transport.send({ kind: 'host_mute', from: this.me.id, to: target })
@@ -190,6 +207,38 @@ export class VoiceMesh {
       this.me = { ...this.me, muted }
       if (this.state.status === 'live') this.transport.announce(this.me)
     }
+  }
+
+  // ── Loudspeaker ─────────────────────────────────────────────────────────
+
+  // Phones play call audio quietly, sometimes through the earpiece. With
+  // Loudspeaker on, voices go through Web Audio instead: a gain boost, then a
+  // compressor so loud talkers do not distort, out of the main speaker.
+  private setupLoudspeaker() {
+    if (!this.ctx) return
+    try {
+      const gain = this.ctx.createGain()
+      const limiter = this.ctx.createDynamicsCompressor()
+      limiter.threshold.value = -12
+      limiter.knee.value = 6
+      limiter.ratio.value = 12
+      limiter.attack.value = 0.003
+      limiter.release.value = 0.25
+      gain.connect(limiter)
+      limiter.connect(this.ctx.destination)
+      this.loudOut = gain
+    } catch {
+      this.loudOut = null
+    }
+    this.applyLoudspeaker()
+  }
+
+  private applyLoudspeaker() {
+    const on = this.state.loudspeaker && Boolean(this.loudOut)
+    if (this.loudOut) this.loudOut.gain.value = on ? LOUD_GAIN : 0
+    // The plain audio element still has to play (muted) or some browsers
+    // never deliver the remote audio to Web Audio.
+    for (const link of this.links.values()) link.audio.muted = on && Boolean(link.boost)
   }
 
   // ── Peers ────────────────────────────────────────────────────────────────
@@ -235,6 +284,16 @@ export class VoiceMesh {
       audio.srcObject = remote
       void audio.play().catch(() => {})
       link.analyser = this.makeAnalyser(remote)
+      if (this.ctx && this.loudOut) {
+        try {
+          link.boost?.disconnect()
+          link.boost = this.ctx.createMediaStreamSource(remote)
+          link.boost.connect(this.loudOut)
+        } catch {
+          link.boost = undefined
+        }
+      }
+      this.applyLoudspeaker()
     }
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState
@@ -261,6 +320,7 @@ export class VoiceMesh {
     const link = this.links.get(peerId)
     if (!link) return
     link.pc.close()
+    link.boost?.disconnect()
     link.audio.srcObject = null
     link.audio.remove()
     this.links.delete(peerId)

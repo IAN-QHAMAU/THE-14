@@ -16,6 +16,16 @@ function MicIcon({ off = false, className }: { off?: boolean; className?: string
   )
 }
 
+function SpeakerIcon({ loud = false, className }: { loud?: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={cn('w-5 h-5', className)} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M11 5L6 9H3v6h3l5 4V5z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      {loud && <path d="M18.5 5.5a9 9 0 0 1 0 13" />}
+    </svg>
+  )
+}
+
 /** Floating voice button for players, bottom right. */
 export function VoiceFab() {
   const voice = useVoice()
@@ -41,6 +51,20 @@ export function VoiceFab() {
             )}
           >
             <MicIcon off={off} />
+          </button>
+        )}
+        {live && (
+          <button
+            type="button"
+            onClick={voice.toggleLoudspeaker}
+            aria-label={voice.state.loudspeaker ? 'Loudspeaker off' : 'Loudspeaker on'}
+            aria-pressed={voice.state.loudspeaker}
+            className={cn(
+              'w-11 h-11 rounded-full flex items-center justify-center shadow-sm border transition-colors',
+              voice.state.loudspeaker ? 'bg-stone-900 border-stone-900 text-stone-50' : 'bg-white/90 backdrop-blur border-stone-200 text-stone-700',
+            )}
+          >
+            <SpeakerIcon loud={voice.state.loudspeaker} />
           </button>
         )}
         <button
@@ -201,10 +225,25 @@ function VoiceSheet({
                 <MicIcon off={state.muted} className="w-4 h-4" />
                 {state.muted ? 'Unmute' : 'Mute'}
               </button>
+              <button
+                type="button"
+                onClick={voice.toggleLoudspeaker}
+                aria-pressed={state.loudspeaker}
+                className={cn(
+                  'flex-1 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2',
+                  state.loudspeaker ? (dark ? 'bg-stone-50 text-stone-900' : 'bg-stone-900 text-stone-50') : cn('border', dark ? 'border-stone-700' : 'border-stone-200'),
+                )}
+              >
+                <SpeakerIcon loud={state.loudspeaker} className="w-4 h-4" />
+                Speaker
+              </button>
               <button type="button" onClick={voice.leave} className={cn('flex-1 rounded-xl py-2.5 text-sm border', dark ? 'border-stone-700' : 'border-stone-200')}>
                 Leave
               </button>
             </div>
+            <p className={cn('text-xs', muted)}>
+              {state.loudspeaker ? 'Loudspeaker is on: voices are boosted so you can hear from across the room.' : 'Hard to hear? Turn on Speaker to make everyone louder.'}
+            </p>
             {isHost && everyone.length > 1 && (
               <button type="button" onClick={() => voice.hostMute('*')} className={cn('w-full text-sm rounded-xl py-2.5 border', dark ? 'border-stone-700' : 'border-stone-200')}>
                 Mute everyone
