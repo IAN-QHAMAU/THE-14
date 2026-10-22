@@ -69,7 +69,7 @@ const STYLES: Record<AvatarStyle, StyleDef> = {
   },
 }
 
-type Renderer = (seed: string, bg: string, mood: AvatarMood) => string
+type Renderer = (seed: string, bg: string, mood: AvatarMood, plain?: boolean) => string
 const renderers = new Map<AvatarStyle, Promise<Renderer>>()
 const cache = new Map<string, string>()
 
@@ -79,9 +79,9 @@ function loadRenderer(style: AvatarStyle): Promise<Renderer> {
     const def = STYLES[style]
     p = Promise.all([import('@dicebear/core'), def.load()]).then(([core, mod]) => {
       const styleDef = mod as Parameters<typeof core.createAvatar>[0]
-      return (seed: string, bg: string, mood: AvatarMood) =>
+      return (seed: string, bg: string, mood: AvatarMood, plain = false) =>
         core
-          .createAvatar(styleDef, { seed, backgroundColor: [bg], radius: 50, ...def.base, ...(mood ? def[mood] : null) })
+          .createAvatar(styleDef, { seed, ...(plain ? {} : { backgroundColor: [bg], radius: 50 }), ...def.base, ...(mood ? def[mood] : null) })
           .toDataUri()
     })
     renderers.set(style, p)
@@ -227,14 +227,15 @@ export function AvatarDisplay({
 }
 
 /** Data URI for an avatar, or null for legacy emoji avatars. Used by the share card. */
-export async function getAvatarDataUri(avatarId: string, mood: AvatarMood = null): Promise<string | null> {
+/** `plain` leaves out the round background, for drawing the character on its own. */
+export async function getAvatarDataUri(avatarId: string, mood: AvatarMood = null, plain = false): Promise<string | null> {
   const parsed = parseAvatar(avatarId)
   if (!parsed) return null
-  const key = `${parsed.style}:${parsed.seed}:${parsed.bg}:${mood ?? ''}`
+  const key = `${parsed.style}:${parsed.seed}:${parsed.bg}:${mood ?? ''}${plain ? ':plain' : ''}`
   const hit = cache.get(key)
   if (hit) return hit
   const render = await loadRenderer(parsed.style)
-  const out = render(parsed.seed, parsed.bg, mood)
+  const out = render(parsed.seed, parsed.bg, mood, plain)
   cache.set(key, out)
   return out
 }

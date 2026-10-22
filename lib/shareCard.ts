@@ -89,11 +89,6 @@ function background(ctx: CanvasRenderingContext2D, accent: string, glowY: number
   }
   ctx.putImageData(grain, 0, 0)
 
-  // A thin frame, like a collectible card.
-  roundRect(ctx, 36, SAFE_TOP - 96, W - 72, SAFE_BOTTOM - SAFE_TOP + 196, 44)
-  ctx.strokeStyle = 'rgba(250, 250, 249, 0.07)'
-  ctx.lineWidth = 2
-  ctx.stroke()
 }
 
 export function ordinal(n: number) {
@@ -187,20 +182,10 @@ function header({ ctx, font }: Ctx) {
 }
 
 function footer({ ctx, font }: Ctx) {
-  // Tagline plus where to play, so the card invites the next game.
-  const tag = 'Kwani me hudoo.'
-  const sep = '   ·   '
-  const site = typeof window !== 'undefined' ? window.location.host : 'the-14.vercel.app'
-  ctx.font = `400 26px ${font}`
-  ctx.textAlign = 'left'
-  const total = ctx.measureText(tag + sep + site).width
-  let x = (W - total) / 2
-  const y = SAFE_BOTTOM + 60
   ctx.fillStyle = C.faint
-  ctx.fillText(tag + sep, x, y)
-  x += ctx.measureText(tag + sep).width
-  ctx.fillStyle = C.brand
-  ctx.fillText(site, x, y)
+  ctx.font = `400 26px ${font}`
+  ctx.textAlign = 'center'
+  ctx.fillText('Kwani me hudoo.', W / 2, SAFE_BOTTOM + 60)
 }
 
 interface StandingRow {
@@ -298,79 +283,204 @@ async function standings(
   }
 }
 
-function statTiles(c: Ctx, tiles: { value: string; label: string }[], y: number, h: number) {
-  const { ctx, font } = c
-  const gap = 20
-  const w = (W - PAD * 2 - gap * (tiles.length - 1)) / tiles.length
-  tiles.forEach((t, i) => {
-    const x = PAD + i * (w + gap)
-    roundRect(ctx, x, y, w, h, 22)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.045)'
-    ctx.fill()
-    ctx.textAlign = 'center'
-    ctx.fillStyle = C.text
-    ctx.font = `300 ${Math.round(h * 0.36)}px ${font}`
-    ctx.fillText(t.value, x + w / 2, y + h * 0.5)
-    label(c, t.label, x + w / 2, y + h * 0.8, 'center')
-  })
+// ─── Collector card pieces ───────────────────────────────────────────────
+
+const CARD = { x: 44, y: SAFE_TOP - 100, w: W - 88, h: SAFE_BOTTOM - SAFE_TOP + 200, r: 52 }
+
+/** The card body: a slightly raised panel with a holographic foil edge. */
+function cardBody(ctx: CanvasRenderingContext2D) {
+  roundRect(ctx, CARD.x, CARD.y, CARD.w, CARD.h, CARD.r)
+  const body = ctx.createLinearGradient(0, CARD.y, 0, CARD.y + CARD.h)
+  body.addColorStop(0, 'rgba(255, 250, 245, 0.045)')
+  body.addColorStop(1, 'rgba(255, 250, 245, 0.015)')
+  ctx.fillStyle = body
+  ctx.fill()
+  // Foil: a soft amber, rose and blue sheen running along the edge.
+  const foil = ctx.createLinearGradient(CARD.x, CARD.y, CARD.x + CARD.w, CARD.y + CARD.h)
+  foil.addColorStop(0, 'rgba(242, 165, 65, 0.55)')
+  foil.addColorStop(0.3, 'rgba(242, 141, 178, 0.35)')
+  foil.addColorStop(0.55, 'rgba(127, 167, 245, 0.35)')
+  foil.addColorStop(0.8, 'rgba(108, 203, 139, 0.25)')
+  foil.addColorStop(1, 'rgba(242, 165, 65, 0.5)')
+  ctx.strokeStyle = foil
+  ctx.lineWidth = 3
+  ctx.stroke()
+  // A second hairline just inside, like a printed border.
+  roundRect(ctx, CARD.x + 16, CARD.y + 16, CARD.w - 32, CARD.h - 32, CARD.r - 14)
+  ctx.strokeStyle = 'rgba(250, 250, 249, 0.05)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+}
+
+/** Clip drawing to the card so big shapes bleed off its edges, not the image. */
+function clipToCard(ctx: CanvasRenderingContext2D, draw: () => void) {
+  ctx.save()
+  roundRect(ctx, CARD.x, CARD.y, CARD.w, CARD.h, CARD.r)
+  ctx.clip()
+  draw()
+  ctx.restore()
+}
+
+/** An arch: round on top, softly squared at the bottom. */
+function archPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, extendUp = 0) {
+  const r = w / 2
+  const br = Math.min(28, w / 6)
+  ctx.beginPath()
+  if (extendUp) {
+    // Same sides, but open far above the arch so a head can break out.
+    ctx.moveTo(x - extendUp, y - extendUp)
+    ctx.lineTo(x + w + extendUp, y - extendUp)
+    ctx.lineTo(x + w + extendUp, y + r)
+    ctx.lineTo(x + w, y + r)
+  } else {
+    ctx.moveTo(x, y + r)
+    ctx.arc(x + r, y + r, r, Math.PI, 0)
+  }
+  ctx.lineTo(x + w, y + h - br)
+  ctx.arcTo(x + w, y + h, x + w - br, y + h, br)
+  ctx.lineTo(x + br, y + h)
+  ctx.arcTo(x, y + h, x, y + h - br, br)
+  if (extendUp) {
+    ctx.lineTo(x, y + r)
+    ctx.lineTo(x - extendUp, y + r)
+  }
+  ctx.closePath()
+}
+
+function lighten(hex: string, amt: number) {
+  const n = parseInt(hex, 16)
+  const mix = (c: number) => Math.round(c + (255 - c) * amt)
+  return ((mix((n >> 16) & 255) << 16) | (mix((n >> 8) & 255) << 8) | mix(n & 255)).toString(16).padStart(6, '0')
+}
+
+function darken(hex: string, amt: number) {
+  const n = parseInt(hex, 16)
+  const mix = (c: number) => Math.round(c * (1 - amt))
+  return ((mix((n >> 16) & 255) << 16) | (mix((n >> 8) & 255) << 8) | mix(n & 255)).toString(16).padStart(6, '0')
 }
 
 /**
- * Mini podium: 2nd, 1st, 3rd on blocks. `scale` shrinks it for the player
- * card; the viewer's own spot gets a ring in their colour.
+ * A character standing in an arch of their own colour, with the head
+ * breaking out over the top edge.
  */
-async function miniPodium(
+async function portrait(
+  ctx: CanvasRenderingContext2D,
+  avatarId: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  font: string,
+  mood: AvatarMood = null,
+) {
+  const colour = accentOf(avatarId)
+  archPath(ctx, x, y, w, h)
+  const fill = ctx.createLinearGradient(0, y, 0, y + h)
+  fill.addColorStop(0, `#${lighten(colour, 0.25)}`)
+  fill.addColorStop(1, `#${darken(colour, 0.12)}`)
+  ctx.fillStyle = fill
+  ctx.fill()
+  // A soft light behind the head.
+  const glow = ctx.createRadialGradient(x + w / 2, y + h * 0.38, 0, x + w / 2, y + h * 0.38, w * 0.6)
+  glow.addColorStop(0, 'rgba(255, 255, 255, 0.35)')
+  glow.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  ctx.fillStyle = glow
+  ctx.fill()
+
+  const uri = await getAvatarDataUri(avatarId, mood, true).catch(() => null)
+  const img = uri ? await loadImage(uri) : null
+  ctx.save()
+  archPath(ctx, x, y, w, h, w * 0.4)
+  ctx.clip()
+  if (img) {
+    // Drawn larger than the arch and lifted, so the head breaks out over the top.
+    const size = w * 1.32
+    ctx.drawImage(img, x + (w - size) / 2, y + h - size * 1.06, size, size)
+  } else {
+    ctx.fillStyle = C.text
+    ctx.font = `${Math.round(w * 0.5)}px ${font}`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(legacyEmoji(avatarId), x + w / 2, y + h / 2)
+    ctx.textBaseline = 'alphabetic'
+  }
+  ctx.restore()
+}
+
+/** A ticket stub panel, with a perforated tear line when `tearY` is given. */
+function ticket(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, tearY: number | null) {
+  // What shows through the notches: the card just beside the panel.
+  const px = ctx.getImageData(Math.max(0, x - 12), tearY ?? y, 1, 1).data
+  roundRect(ctx, x, y, w, h, 34)
+  ctx.fillStyle = 'rgba(255, 250, 245, 0.05)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(250, 250, 249, 0.06)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  if (tearY === null) return
+  // Notches cut into each side at the tear line.
+  ctx.fillStyle = `rgb(${px[0]}, ${px[1]}, ${px[2]})`
+  for (const cx of [x, x + w]) {
+    ctx.beginPath()
+    ctx.arc(cx, tearY, 22, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // Dashed perforation between the notches.
+  ctx.save()
+  ctx.setLineDash([10, 12])
+  ctx.strokeStyle = 'rgba(250, 250, 249, 0.16)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(x + 36, tearY)
+  ctx.lineTo(x + w - 36, tearY)
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** Top three in a row: 2nd, 1st, 3rd, each in a small arch of their colour. */
+async function podiumArches(
   c: Ctx,
   rows: StandingRow[],
   tags: Record<string, PlayerTag>,
   base: number,
-  scale = 1,
+  scale: number,
   highlight?: string,
-  accent = DEFAULT_ACCENT,
 ) {
   const { ctx, font } = c
-  const byPlace = (n: number) => rows[n]
-  const slots = [
-    { r: byPlace(1), h: 110, color: C.silver, text: C.soft },
-    { r: byPlace(0), h: 160, color: C.gold, text: C.bg },
-    { r: byPlace(2), h: 80, color: C.bronze, text: C.muted },
-  ]
-  const colW = 230 * scale
-  const colGap = 30 * scale
-  const startX = (W - (colW * 3 + colGap * 2)) / 2
-  for (let i = 0; i < slots.length; i++) {
-    const { r, h: rawH, color, text } = slots[i]
-    if (!r) continue
-    const e = r.entry
-    const h = rawH * scale
-    const x = startX + i * (colW + colGap)
-    const blockTop = base - h
-    const av = Math.round(104 * scale)
-    const avY = blockTop - av - 100 * scale
-    if (e.player_id === highlight) {
-      ctx.beginPath()
-      ctx.arc(x + colW / 2, avY + av / 2, av / 2 + 8, 0, Math.PI * 2)
-      ctx.strokeStyle = rgba(accent, 0.7)
-      ctx.lineWidth = 3
-      ctx.stroke()
-    }
-    await drawAvatar(ctx, e.avatar, x + (colW - av) / 2, avY, av, font)
-    ctx.textAlign = 'center'
-    ctx.fillStyle = e.player_id === highlight ? C.text : C.soft
-    ctx.font = `500 ${Math.round(28 * scale)}px ${font}`
-    ctx.fillText(fitText(ctx, e.name, colW - 10), x + colW / 2, blockTop - 56 * scale)
-    const tag = tags[e.player_id]?.title
-    if (tag) {
+  const order = [rows[1], rows[0], rows[2]]
+  const widths = [200, 240, 200].map((v) => v * scale)
+  const heights = [230, 290, 200].map((v) => v * scale)
+  const gap = 34 * scale
+  const total = widths.reduce((a, b) => a + b, 0) + gap * 2
+  let x = (W - total) / 2
+  for (let i = 0; i < 3; i++) {
+    const r = order[i]
+    const w = widths[i]
+    const h = heights[i]
+    if (r) {
+      const top = base - h
+      await portrait(ctx, r.entry.avatar, x, top, w, h, font, r.rank === 1 ? 'happy' : null)
+      // Place chip at the foot of the arch.
+      const chipW = 84 * scale
+      const chipH = 44 * scale
+      roundRect(ctx, x + (w - chipW) / 2, base - chipH / 2, chipW, chipH, chipH / 2)
+      ctx.fillStyle = r.rank === 1 ? C.brand : '#2a2522'
+      ctx.fill()
+      ctx.fillStyle = r.rank === 1 ? '#2B1D0A' : C.soft
+      ctx.font = `600 ${Math.round(22 * scale)}px ${font}`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(ordinal(r.rank), x + w / 2, base + 1)
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillStyle = r.entry.player_id === highlight ? C.text : C.soft
+      ctx.font = `500 ${Math.round(28 * scale)}px ${font}`
+      ctx.fillText(fitText(ctx, r.entry.name, w + gap - 8), x + w / 2, base + 62 * scale)
       ctx.fillStyle = C.muted
-      ctx.font = `400 ${Math.round(22 * scale)}px ${font}`
-      ctx.fillText(fitText(ctx, tag, colW - 10), x + colW / 2, blockTop - 22 * scale)
+      ctx.font = `400 ${Math.round(23 * scale)}px ${font}`
+      const tag = tags[r.entry.player_id]?.title
+      ctx.fillText(fitText(ctx, tag ? `${r.entry.total.toLocaleString()}  ·  ${tag}` : r.entry.total.toLocaleString(), w + gap - 8), x + w / 2, base + 98 * scale)
     }
-    roundRect(ctx, x, blockTop, colW, h, 18 * scale)
-    ctx.fillStyle = color
-    ctx.fill()
-    ctx.fillStyle = text
-    ctx.font = `300 ${Math.round(34 * scale)}px ${font}`
-    ctx.fillText(ordinal(r.rank), x + colW / 2, blockTop + 48 * scale)
+    x += w + gap
   }
 }
 
@@ -383,103 +493,112 @@ async function playerCard(c: Ctx, input: ShareCardInput) {
   const s = input.stats[me.player_id]
   const accent = accentOf(me.avatar)
 
-  const hero = 180
-  const heroY = SAFE_TOP + 85
-  const nameY = heroY + hero + 62
-  const placeSize = 104
-  const placeY = nameY + placeSize + 4
-  const pointsY = placeY + 52
-  const chipY = pointsY + 36
-  const tilesY = chipY + 96
-  const tilesH = 112
+  // A huge, faint rank number behind everything, bleeding off the card.
+  clipToCard(ctx, () => {
+    ctx.fillStyle = rgba(accent, 0.1)
+    ctx.font = `200 760px ${font}`
+    ctx.textAlign = 'right'
+    spaced(ctx, -30)
+    ctx.fillText(String(rank), CARD.x + CARD.w + 40, SAFE_TOP + 700)
+    spaced(ctx, 0)
+  })
 
-  // Thin ring around the avatar.
+  // Portrait.
+  const archW = 330
+  const archH = 380
+  const archY = SAFE_TOP + 92
+  await portrait(ctx, me.avatar, (W - archW) / 2, archY, archW, archH, font, rank <= 3 ? 'happy' : null)
+  // Rank seal on the arch's shoulder.
+  const sealX = (W + archW) / 2 - 18
+  const sealY = archY + 64
   ctx.beginPath()
-  ctx.arc(W / 2, heroY + hero / 2, hero / 2 + 12, 0, Math.PI * 2)
-  ctx.strokeStyle = rgba(accent, 0.45)
-  ctx.lineWidth = 3
+  ctx.arc(sealX, sealY, 46, 0, Math.PI * 2)
+  ctx.fillStyle = rank === 1 ? C.brand : '#2a2522'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(28, 25, 23, 0.9)'
+  ctx.lineWidth = 6
   ctx.stroke()
-  // Top three smile on their own card.
-  await drawAvatar(ctx, me.avatar, (W - hero) / 2, heroY, hero, font, rank <= 3 ? 'happy' : null)
-
+  ctx.fillStyle = rank === 1 ? '#2B1D0A' : C.text
+  ctx.font = `600 30px ${font}`
   ctx.textAlign = 'center'
-  ctx.fillStyle = C.soft
-  ctx.font = `500 44px ${font}`
-  ctx.fillText(fitText(ctx, me.name, W - PAD * 2), W / 2, nameY)
+  ctx.textBaseline = 'middle'
+  ctx.fillText(ordinal(rank), sealX, sealY + 1)
+  ctx.textBaseline = 'alphabetic'
 
+  // Name, place and points.
+  const nameY = archY + archH + 66
+  ctx.fillStyle = C.muted
+  ctx.font = `500 30px ${font}`
+  spaced(ctx, 6)
+  ctx.fillText(fitText(ctx, me.name.toUpperCase(), W - PAD * 2), W / 2, nameY)
+  spaced(ctx, 0)
+  const placeY = nameY + 116
   ctx.fillStyle = C.text
-  ctx.font = `300 ${placeSize}px ${font}`
-  spaced(ctx, -2)
+  ctx.font = `300 112px ${font}`
+  spaced(ctx, -3)
   ctx.fillText(rank === 1 ? 'Winner' : `${ordinal(rank)} place`, W / 2, placeY)
   spaced(ctx, 0)
-
+  const pointsY = placeY + 52
   ctx.fillStyle = C.muted
-  ctx.font = `400 32px ${font}`
+  ctx.font = `400 30px ${font}`
   ctx.fillText(`${me.total.toLocaleString()} points  ·  ${sorted.length} players`, W / 2, pointsY)
 
+  // Ticket stub: tag and stats above the tear, the podium below it.
+  const tY = pointsY + 44
+  const tH = SAFE_BOTTOM - tY
+  const tearY = tY + (tag ? 214 : 170)
+  ticket(ctx, PAD, tY, W - PAD * 2, tH, tearY)
+
   if (tag) {
-    ctx.font = `500 32px ${font}`
-    const tw = ctx.measureText(tag.title).width
-    ctx.font = `400 27px ${font}`
-    const dw = tag.detail ? ctx.measureText(tag.detail).width : 0
-    const w = Math.min(W - PAD * 2, tw + (dw ? dw + 32 : 0) + 68)
-    const x = (W - w) / 2
-    roundRect(ctx, x, chipY, w, 72, 36)
-    ctx.fillStyle = rgba(accent, 0.16)
-    ctx.fill()
-    ctx.strokeStyle = rgba(accent, 0.35)
-    ctx.lineWidth = 2
-    ctx.stroke()
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
     ctx.fillStyle = C.text
-    ctx.font = `500 32px ${font}`
-    ctx.fillText(tag.title, x + 34, chipY + 37)
-    if (dw) {
+    ctx.font = `500 34px ${font}`
+    ctx.textAlign = 'center'
+    ctx.fillText(tag.title, W / 2, tY + 60)
+    if (tag.detail) {
       ctx.fillStyle = C.muted
-      ctx.font = `400 27px ${font}`
-      ctx.fillText(fitText(ctx, tag.detail, w - tw - 100), x + 34 + tw + 32, chipY + 37)
+      ctx.font = `400 26px ${font}`
+      ctx.fillText(tag.detail, W / 2, tY + 96)
     }
-    ctx.textBaseline = 'alphabetic'
   }
-
   if (s) {
-    statTiles(
-      c,
-      [
-        { value: s.graded ? `${s.correct}/${s.graded}` : String(s.correct), label: 'Right' },
-        { value: String(s.bestStreak), label: 'Best streak' },
-        { value: s.avgMs != null ? `${(s.avgMs / 1000).toFixed(1)}s` : '-', label: 'Avg speed' },
-      ],
-      tilesY,
-      tilesH,
-    )
+    const cells = [
+      { value: s.graded ? `${s.correct}/${s.graded}` : String(s.correct), label: 'Right' },
+      { value: String(s.bestStreak), label: 'Best streak' },
+      { value: s.avgMs != null ? `${(s.avgMs / 1000).toFixed(1)}s` : '-', label: 'Avg speed' },
+    ]
+    const cw = (W - PAD * 2) / 3
+    const vy = tag ? tY + 150 : tY + 104
+    cells.forEach((cell, i) => {
+      const cx = PAD + cw * i + cw / 2
+      ctx.fillStyle = C.text
+      ctx.font = `300 44px ${font}`
+      ctx.textAlign = 'center'
+      ctx.fillText(cell.value, cx, vy)
+      label(c, cell.label, cx, vy + 30, 'center')
+      if (i > 0) {
+        ctx.fillStyle = 'rgba(250, 250, 249, 0.08)'
+        ctx.fillRect(PAD + cw * i, vy - 38, 2, 76)
+      }
+    })
   }
 
-  // Podium for the top 3, places 4 to 6 below it, then your own row if lower.
+  // Podium below the tear.
   const all = rankRows(input.scores)
-  const podiumTop = tilesY + tilesH + 54
-  label(c, 'Podium', PAD, podiumTop)
-  const scale = 0.88
-  // Tallest column: avatar, name, tag and the 1st place block.
-  const podiumBase = podiumTop + 30 + Math.round((104 + 100 + 160) * scale)
-  await miniPodium(c, all, input.tags, podiumBase, scale, me.player_id, accent)
-
-  const next = all.slice(3, 6)
   const mine = all.find((r) => r.entry.player_id === me.player_id)
-  const shown = all.slice(0, 6).some((r) => r.entry.player_id === me.player_id)
-  // Only as many rows as fit above the safe area; your own row comes first.
-  const top = podiumBase + 16
-  const fit = Math.max(1, Math.floor((SAFE_BOTTOM - top - 30 - (shown ? 0 : 44)) / 78))
-  const rows = shown || !mine ? next.slice(0, fit) : [...next.slice(0, fit - 1), mine]
-  if (rows.length) {
-    await standings(c, input, rows, {
-      top,
-      bottom: SAFE_BOTTOM,
+  const inTop = all.slice(0, 3).some((r) => r.entry.player_id === me.player_id)
+  const scale = !inTop && mine ? 0.6 : 0.72
+  const below = SAFE_BOTTOM - tearY
+  // Podium plus names, and your own row under it when you are not in the top 3.
+  const block = 290 * scale + 100 * scale + (scale < 0.7 ? 120 : 0)
+  const base = tearY + Math.max(36, (below - block) / 2) + 290 * scale
+  await podiumArches(c, all, input.tags, base, scale, me.player_id)
+  if (!inTop && mine) {
+    await standings(c, input, [mine], {
+      top: base + 100 * scale - 14,
+      bottom: base + 100 * scale - 14 + 30 + 92,
       title: '',
       highlight: me.player_id,
       accent,
-      dividerBefore: shown ? undefined : rows.length - 1,
       details: true,
     })
   }
@@ -491,13 +610,31 @@ async function groupCard(c: Ctx, input: ShareCardInput) {
 
   ctx.textAlign = 'center'
   ctx.fillStyle = C.text
-  ctx.font = `300 76px ${font}`
-  ctx.fillText('Final results', W / 2, SAFE_TOP + 145)
-  label(c, `${sorted.length} players`, W / 2, SAFE_TOP + 198, 'center')
+  ctx.font = `300 84px ${font}`
+  spaced(ctx, -2)
+  ctx.fillText('Final results', W / 2, SAFE_TOP + 150)
+  spaced(ctx, 0)
+  label(c, `${sorted.length} players`, W / 2, SAFE_TOP + 202, 'center')
 
-  await miniPodium(c, rankRows(input.scores), input.tags, SAFE_TOP + 600)
-
-  await standings(c, input, rankRows(input.scores), { top: SAFE_TOP + 690, bottom: SAFE_BOTTOM, title: 'Everyone', details: input.scores.length <= 8 })
+  const rows = rankRows(input.scores)
+  const rest = rows.slice(3)
+  if (!rest.length) {
+    // Just the top three: a bigger podium in the middle of the card.
+    await podiumArches(c, rows, input.tags, SAFE_TOP + 900, 1.15)
+    return
+  }
+  // The list panel grows with the number of players, and the podium and list
+  // sit together in the middle of the card.
+  const cols = rest.length > 8 ? 2 : 1
+  const perCol = Math.ceil(rest.length / cols)
+  const listH = 20 + perCol * 100 + (perCol - 1) * 14 + 20
+  const spare = Math.max(0, SAFE_BOTTOM - (SAFE_TOP + 710 + listH))
+  const base = SAFE_TOP + 560 + spare / 2
+  await podiumArches(c, rows, input.tags, base, 1)
+  const tY = base + 150
+  const tB = Math.min(SAFE_BOTTOM, tY + listH)
+  ticket(ctx, PAD, tY, W - PAD * 2, tB - tY, null)
+  await standings(c, input, rest, { top: tY - 10, bottom: tB - 20, title: '', details: rest.length <= 6 })
 }
 
 export async function renderShareCard(input: ShareCardInput): Promise<Blob | null> {
@@ -517,7 +654,8 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob | nul
   if (!ctx) return null
 
   const accent = input.mode === 'player' ? accentOf(input.me?.avatar) : DEFAULT_ACCENT
-  background(ctx, accent, input.mode === 'player' ? SAFE_TOP + 175 : SAFE_TOP + 270)
+  background(ctx, accent, input.mode === 'player' ? SAFE_TOP + 260 : SAFE_TOP + 380)
+  cardBody(ctx)
   const c = { ctx, font }
   header(c)
   if (input.mode === 'player') await playerCard(c, input)
