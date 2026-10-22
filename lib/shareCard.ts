@@ -24,10 +24,11 @@ const C = {
   soft: '#d6d3d1',
   muted: '#a8a29e',
   faint: '#78716c',
-  gold: '#e7e5e4',
+  gold: '#ecc98e',
   silver: '#57534e',
   bronze: '#44403c',
   good: '#34d399',
+  brand: '#f2a541',
 }
 
 // Muted medal tones for ranks 1 to 3.
@@ -69,6 +70,30 @@ function background(ctx: CanvasRenderingContext2D, accent: string, glowY: number
   r.addColorStop(1, rgba(accent, 0))
   ctx.fillStyle = r
   ctx.fillRect(0, 0, W, H)
+
+  // A faint warm light from the bottom corner, in the brand amber.
+  const warm = ctx.createRadialGradient(W, H, 0, W, H, 900)
+  warm.addColorStop(0, rgba('f2a541', 0.07))
+  warm.addColorStop(1, rgba('f2a541', 0))
+  ctx.fillStyle = warm
+  ctx.fillRect(0, 0, W, H)
+
+  // Fine grain, so it feels printed rather than flat.
+  const grain = ctx.getImageData(0, 0, W, H)
+  const d = grain.data
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - 0.5) * 10
+    d[i] += n
+    d[i + 1] += n
+    d[i + 2] += n
+  }
+  ctx.putImageData(grain, 0, 0)
+
+  // A thin frame, like a collectible card.
+  roundRect(ctx, 36, SAFE_TOP - 96, W - 72, SAFE_BOTTOM - SAFE_TOP + 196, 44)
+  ctx.strokeStyle = 'rgba(250, 250, 249, 0.07)'
+  ctx.lineWidth = 2
+  ctx.stroke()
 }
 
 export function ordinal(n: number) {
@@ -145,8 +170,13 @@ function header({ ctx, font }: Ctx) {
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
   ctx.fillStyle = C.text
+  // The brand mark: a small amber tile before the name.
+  roundRect(ctx, PAD, SAFE_TOP - 34, 30, 30, 8)
+  ctx.fillStyle = C.brand
+  ctx.fill()
+  ctx.fillStyle = C.text
   ctx.font = `300 52px ${font}`
-  ctx.fillText('THE 14', PAD, SAFE_TOP)
+  ctx.fillText('THE 14', PAD + 46, SAFE_TOP)
   label({ ctx, font }, new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }), W - PAD, SAFE_TOP - 6, 'right')
   ctx.strokeStyle = C.line
   ctx.lineWidth = 2
@@ -157,10 +187,20 @@ function header({ ctx, font }: Ctx) {
 }
 
 function footer({ ctx, font }: Ctx) {
-  ctx.fillStyle = C.faint
+  // Tagline plus where to play, so the card invites the next game.
+  const tag = 'Kwani me hudoo.'
+  const sep = '   ·   '
+  const site = typeof window !== 'undefined' ? window.location.host : 'the-14.vercel.app'
   ctx.font = `400 26px ${font}`
-  ctx.textAlign = 'center'
-  ctx.fillText('Kwani me hudoo.', W / 2, SAFE_BOTTOM + 60)
+  ctx.textAlign = 'left'
+  const total = ctx.measureText(tag + sep + site).width
+  let x = (W - total) / 2
+  const y = SAFE_BOTTOM + 60
+  ctx.fillStyle = C.faint
+  ctx.fillText(tag + sep, x, y)
+  x += ctx.measureText(tag + sep).width
+  ctx.fillStyle = C.brand
+  ctx.fillText(site, x, y)
 }
 
 interface StandingRow {

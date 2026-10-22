@@ -6,6 +6,7 @@ import {
   CATEGORIES,
   CATEGORY_GROUPS,
   GAME_TYPES,
+  GROUP_TINT,
   MAX_QUESTIONS,
   MIN_QUESTIONS,
   PICKABLE_CATEGORIES,
@@ -22,17 +23,64 @@ import {
 } from '@/lib/game/questions'
 import { cn } from '@/lib/utils'
 
-export const DEFAULT_SETTINGS: GameSettings = {
-  categories: ['general', 'movies', 'football', 'africa'],
-  types: ['choice', 'truefalse', 'emoji', 'closest', 'oddone'],
-  timer: 20,
-  questionCount: 12,
-  difficulty: 'mixed',
-}
-
 /** How long a game these settings can make (a chosen level is strict). */
 export function poolSize(settings: GameSettings) {
   return maxGameLength(settings)
+}
+
+/** Ready made games, so a host can start in one tap. */
+const PRESETS: { id: string; title: string; blurb: string; settings: GameSettings }[] = [
+  {
+    id: 'quick',
+    title: 'Quick Round',
+    blurb: '10 mixed questions. About five minutes.',
+    settings: {
+      categories: ['general', 'movies', 'music', 'football', 'kenya', 'animals', 'food'],
+      types: ['choice', 'truefalse', 'emoji', 'oddone'],
+      timer: 20,
+      questionCount: 10,
+      difficulty: 'mixed',
+      finalWager: false,
+    },
+  },
+  {
+    id: 'party',
+    title: 'Party Night',
+    blurb: 'Quiz mixed with party rounds, then a Final Wager.',
+    settings: {
+      categories: ['movies', 'music', 'internet', 'afromusic', 'hiphop', 'series', 'football', 'kenya', 'food', 'throwback'],
+      types: ['choice', 'emoji', 'oddone', 'fastest', 'bluff', 'mostlikely', 'sync'],
+      timer: 20,
+      questionCount: 15,
+      difficulty: 'mixed',
+      finalWager: true,
+    },
+  },
+  {
+    id: 'brain',
+    title: 'Brain Battle',
+    blurb: 'Hard questions only. No party rounds.',
+    settings: {
+      categories: PICKABLE_CATEGORIES.filter((c) => CATEGORIES[c].group === 'brain'),
+      types: ['choice', 'truefalse', 'closest', 'order', 'oddone', 'fastest'],
+      timer: 20,
+      questionCount: 15,
+      difficulty: 'hard',
+      finalWager: true,
+    },
+  },
+]
+
+/** New hosts start on Quick Round. */
+export const DEFAULT_SETTINGS: GameSettings = PRESETS[0].settings
+
+const STEPS = ['Start', 'Categories', 'Modes', 'Rules'] as const
+type Step = (typeof STEPS)[number]
+
+/** One line that sums up the game, shown next to the Start button. */
+export function setupSummary(settings: GameSettings, count: number) {
+  const level = DIFFICULTY_SETTINGS.find((d) => d.id === (settings.difficulty ?? 'mixed'))?.label ?? 'Mixed'
+  return [`${count} questions`, level, `${settings.timer}s`, settings.finalWager ? 'Final Wager' : null].filter(Boolean).join(' · ')
 }
 
 interface Props {
@@ -40,24 +88,12 @@ interface Props {
   onChange: (s: GameSettings) => void
 }
 
-function Chip({ active, onClick, children, className }: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'rounded-xl border text-left transition-colors',
-        active ? 'border-stone-200 bg-stone-100 text-stone-900' : 'border-stone-700 text-stone-300 hover:border-stone-500',
-        className,
-      )}
-    >
-      {children}
-    </button>
-  )
+function Label({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-[11px] uppercase tracking-[0.2em] text-stone-500">{children}</h2>
 }
 
 export function GameSetup({ settings, onChange }: Props) {
+  const [step, setStep] = useState<Step>('Start')
   const [group, setGroup] = useState<CategoryGroup>('brain')
   const poolList = useMemo(() => buildPool(settings), [settings])
   const pool = useMemo(() => poolSize(settings), [settings])
@@ -75,192 +111,314 @@ export function GameSetup({ settings, onChange }: Props) {
   const toggleType = (t: QuestionType) =>
     set({ types: settings.types.includes(t) ? settings.types.filter((x) => x !== t) : [...settings.types, t] })
 
+  const same = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((x) => b.includes(x))
+  const activePreset = PRESETS.find(
+    (p) =>
+      same(p.settings.categories, settings.categories) &&
+      same(p.settings.types, settings.types) &&
+      p.settings.questionCount === settings.questionCount &&
+      p.settings.difficulty === settings.difficulty &&
+      Boolean(p.settings.finalWager) === Boolean(settings.finalWager),
+  )
+
   const groupCats = PICKABLE_CATEGORIES.filter((c) => CATEGORIES[c].group === group)
   const allSelected = settings.categories.length === PICKABLE_CATEGORIES.length
   const selectedInGroup = (g: CategoryGroup) => settings.categories.filter((c) => CATEGORIES[c].group === g).length
   const groupFull = groupCats.every((c) => settings.categories.includes(c))
+  const stepIndex = STEPS.indexOf(step)
 
   return (
-    <div className="space-y-8">
-      {/* Categories */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs uppercase tracking-widest text-stone-400">Categories</h2>
-          <button
-            type="button"
-            onClick={() => set({ categories: allSelected ? [] : [...PICKABLE_CATEGORIES] })}
-            className="text-xs text-stone-400 underline underline-offset-4 hover:text-stone-200"
-          >
-            {allSelected ? 'Clear all' : 'Surprise me (all)'}
-          </button>
+    <div className="space-y-6">
+      {/* Steps */}
+      <nav className="space-y-3" aria-label="Game setup">
+        <div className="grid grid-cols-4 gap-1.5">
+          {STEPS.map((s, i) => (
+            <button key={s} type="button" onClick={() => setStep(s)} className="group text-left space-y-1.5" aria-current={step === s ? 'step' : undefined}>
+              <span className={cn('block h-1 rounded-full transition-colors', i <= stepIndex ? 'bg-accent' : 'bg-stone-800 group-hover:bg-stone-700')} />
+              <span className={cn('block text-xs transition-colors', step === s ? 'text-stone-100' : 'text-stone-500 group-hover:text-stone-300')}>{s}</span>
+            </button>
+          ))}
         </div>
+      </nav>
 
-        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1" role="tablist">
-          {CATEGORY_GROUPS.map((g) => {
-            const n = selectedInGroup(g.id)
-            return (
-              <button
-                key={g.id}
-                type="button"
-                role="tab"
-                aria-selected={group === g.id}
-                onClick={() => setGroup(g.id)}
-                className={cn(
-                  'flex-shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors',
-                  group === g.id ? 'bg-stone-100 text-stone-900' : 'text-stone-400 hover:text-stone-200',
-                )}
-              >
-                {g.label}
-                {n > 0 && <span className={cn('ml-1.5 text-xs', group === g.id ? 'text-stone-500' : 'text-stone-500')}>{n}</span>}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {groupCats.map((c) => {
-            const info = CATEGORIES[c]
-            const active = settings.categories.includes(c)
-            return (
-              <Chip key={c} active={active} onClick={() => toggleCat(c)} className="p-3 flex items-center gap-2.5">
-                <span className="text-lg">{info.emoji}</span>
-                <span className="min-w-0">
-                  <span className="block text-sm leading-tight truncate">{info.label}</span>
-                  <span className={cn('block text-[11px]', active ? 'text-stone-500' : 'text-stone-500')}>{countQuestions(c)} questions</span>
-                </span>
-              </Chip>
-            )
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            set({
-              categories: groupFull
-                ? settings.categories.filter((c) => !groupCats.includes(c))
-                : [...new Set([...settings.categories, ...groupCats])],
-            })
-          }
-          className="text-xs text-stone-500 hover:text-stone-300"
-        >
-          {groupFull ? 'Deselect this group' : 'Select this whole group'}
-        </button>
-      </section>
-
-      {/* Game types */}
-      <section className="space-y-3">
-        <h2 className="text-xs uppercase tracking-widest text-stone-400">Game types</h2>
-        <div className="grid gap-2">
-          {ALL_TYPES.map((t) => {
-            const info = GAME_TYPES[t]
-            const active = settings.types.includes(t)
-            return (
-              <Chip key={t} active={active} onClick={() => toggleType(t)} className="p-3 flex items-start gap-3">
-                <span
+      {/* Start: presets */}
+      {step === 'Start' && (
+        <section className="space-y-3 animate-fade-up">
+          <Label>Pick a game</Label>
+          <div className="grid gap-2">
+            {PRESETS.map((p) => {
+              const active = activePreset?.id === p.id
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onChange({ ...settings, ...p.settings })}
                   className={cn(
-                    'mt-0.5 w-4 h-4 rounded-md border flex-shrink-0 flex items-center justify-center text-[10px]',
-                    active ? 'bg-stone-900 border-stone-900 text-stone-50' : 'border-stone-600',
+                    'rounded-2xl border p-4 text-left transition-all',
+                    active ? 'border-accent-line bg-accent-soft' : 'border-stone-800 bg-stone-800/40 hover:border-stone-600',
                   )}
                 >
-                  {active ? '✓' : ''}
-                </span>
-                <span>
-                  <span className="block text-sm">
-                    {info.label}
-                    {info.party && <span className="ml-2 text-[10px] uppercase tracking-wider text-stone-500">Party</span>}
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="text-base text-stone-100">{p.title}</span>
+                    <span className={cn('w-4 h-4 rounded-full border flex-shrink-0 transition-colors', active ? 'border-accent bg-accent' : 'border-stone-600')} />
                   </span>
-                  <span className="block text-xs text-stone-500">{info.description}</span>
-                </span>
-              </Chip>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Difficulty */}
-      <section className="space-y-3">
-        <h2 className="text-xs uppercase tracking-widest text-stone-400">Difficulty</h2>
-        <div className="grid grid-cols-3 gap-1.5">
-          {DIFFICULTY_SETTINGS.map((d) => {
-            const active = (settings.difficulty ?? 'mixed') === d.id
-            return (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => set({ difficulty: d.id })}
-                aria-pressed={active}
-                className={cn(
-                  'rounded-xl border px-2 py-2 text-sm transition-colors',
-                  active ? 'border-stone-200 bg-stone-100 text-stone-900' : 'border-stone-700 text-stone-300 hover:border-stone-500',
-                )}
-              >
-                {d.label}
-              </button>
-            )
-          })}
-        </div>
-        <p className="text-xs text-stone-500">
-          {DIFFICULTY_SETTINGS.find((d) => d.id === (settings.difficulty ?? 'mixed'))?.hint} Your picks have {levels.easy} easy, {levels.medium} medium and {levels.hard} hard questions.
-          {['easy', 'medium', 'hard'].includes(settings.difficulty ?? 'mixed') && ' Only that level is used, so add categories if the game comes out short.'}
-        </p>
-      </section>
-
-      {/* Length and timer */}
-      <section className="grid gap-6">
-        <div className="space-y-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-xs uppercase tracking-widest text-stone-400">Questions</h2>
-            <span className="font-mono text-stone-200">{count}</span>
+                  <span className="block mt-1 text-sm text-stone-400">{p.blurb}</span>
+                </button>
+              )
+            })}
           </div>
-          <input
-            type="range"
-            min={MIN_QUESTIONS}
-            max={maxQ}
-            value={count}
-            onChange={(e) => set({ questionCount: Number(e.target.value) })}
-            disabled={pool < MIN_QUESTIONS}
-            className="w-full range-dark"
-            aria-label="Number of questions"
-          />
-          <p className="text-xs text-stone-500">
-            {pool < MIN_QUESTIONS
-              ? 'Not enough questions. Add a category or game type.'
-              : `Up to ${pool} questions with this setup.`}
-          </p>
-        </div>
+          <button
+            type="button"
+            onClick={() => setStep('Categories')}
+            className={cn(
+              'w-full rounded-2xl border border-dashed p-4 text-left transition-colors',
+              !activePreset ? 'border-accent-line text-stone-100' : 'border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500',
+            )}
+          >
+            <span className="block text-base">{activePreset ? 'Build your own' : 'Your own mix'}</span>
+            <span className="block mt-1 text-sm text-stone-500">Choose categories, modes and rules yourself.</span>
+          </button>
+        </section>
+      )}
 
-        <div className="space-y-3">
-          <h2 className="text-xs uppercase tracking-widest text-stone-400">Time per question</h2>
-          <div className="flex rounded-xl border border-stone-700 p-1">
-            {TIMER_OPTIONS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => set({ timer: t })}
-                className={cn('flex-1 rounded-lg py-1.5 text-sm transition-colors', settings.timer === t ? 'bg-stone-100 text-stone-900' : 'text-stone-400 hover:text-stone-200')}
-              >
-                {t}s
-              </button>
-            ))}
+      {/* Categories */}
+      {step === 'Categories' && (
+        <section className="space-y-3 animate-fade-up">
+          <div className="flex items-center justify-between">
+            <Label>Categories</Label>
+            <button
+              type="button"
+              onClick={() => set({ categories: allSelected ? [] : [...PICKABLE_CATEGORIES] })}
+              className="text-xs text-stone-400 hover:text-stone-200"
+            >
+              {allSelected ? 'Clear all' : 'Select all'}
+            </button>
           </div>
-          <p className="text-xs text-stone-500">Order, Closest and Bluff rounds get a little extra.</p>
-        </div>
 
-        <label className="flex items-start gap-3 rounded-xl border border-stone-700 p-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={settings.finalWager === true}
-            onChange={(e) => set({ finalWager: e.target.checked })}
-            className="mt-0.5 h-4 w-4 accent-stone-100"
-          />
-          <span className="space-y-0.5">
-            <span className="block text-sm text-stone-100">Final Wager</span>
-            <span className="block text-xs text-stone-500">
-              The last question is a bet. Everyone stakes up to half their points before seeing it, then wins or loses the bet.
+          <div className="flex flex-wrap gap-1.5" role="tablist">
+            {CATEGORY_GROUPS.map((g) => {
+              const n = selectedInGroup(g.id)
+              const on = group === g.id
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setGroup(g.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors',
+                    on ? 'border-stone-500 bg-stone-800 text-stone-100' : 'border-transparent text-stone-400 hover:text-stone-200',
+                  )}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: GROUP_TINT[g.id] }} />
+                  {g.label}
+                  {n > 0 && <span className="text-xs text-stone-500">{n}</span>}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {groupCats.map((c) => {
+              const info = CATEGORIES[c]
+              const active = settings.categories.includes(c)
+              const tint = GROUP_TINT[group]
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggleCat(c)}
+                  aria-pressed={active}
+                  className={cn(
+                    'relative rounded-xl border p-3 text-left transition-colors flex items-start gap-2.5',
+                    active ? 'text-stone-50' : 'border-stone-800 bg-stone-800/40 text-stone-300 hover:border-stone-600',
+                  )}
+                  style={active ? { borderColor: `${tint}80`, backgroundColor: `${tint}1f` } : undefined}
+                >
+                  <span className="text-lg leading-none mt-0.5">{info.emoji}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm leading-snug line-clamp-2">{info.label}</span>
+                    <span className="block text-[11px] text-stone-500 mt-0.5">{countQuestions(c)} questions</span>
+                  </span>
+                  {active && (
+                    <span className="absolute top-2 right-2 w-4 h-4 rounded-full text-[10px] flex items-center justify-center text-stone-900" style={{ backgroundColor: tint }}>
+                      ✓
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              set({
+                categories: groupFull
+                  ? settings.categories.filter((c) => !groupCats.includes(c))
+                  : [...new Set([...settings.categories, ...groupCats])],
+              })
+            }
+            className="text-xs text-stone-500 hover:text-stone-300"
+          >
+            {groupFull ? 'Deselect this group' : 'Select this whole group'}
+          </button>
+        </section>
+      )}
+
+      {/* Modes */}
+      {step === 'Modes' && (
+        <section className="space-y-5 animate-fade-up">
+          {[
+            { label: 'Quiz modes', types: ALL_TYPES.filter((t) => !GAME_TYPES[t].party) },
+            { label: 'Party modes', types: ALL_TYPES.filter((t) => GAME_TYPES[t].party) },
+          ].map((block) => (
+            <div key={block.label} className="space-y-2">
+              <Label>{block.label}</Label>
+              <div className="grid gap-2">
+                {block.types.map((t) => {
+                  const info = GAME_TYPES[t]
+                  const active = settings.types.includes(t)
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => toggleType(t)}
+                      aria-pressed={active}
+                      className={cn(
+                        'rounded-xl border p-3 text-left flex items-start gap-3 transition-colors',
+                        active ? 'border-accent-line bg-accent-soft' : 'border-stone-800 bg-stone-800/40 hover:border-stone-600',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'mt-0.5 w-4 h-4 rounded-md border flex-shrink-0 flex items-center justify-center text-[10px] transition-colors',
+                          active ? 'bg-accent border-accent text-accent-ink' : 'border-stone-600',
+                        )}
+                      >
+                        {active ? '✓' : ''}
+                      </span>
+                      <span>
+                        <span className={cn('block text-sm', active ? 'text-stone-50' : 'text-stone-200')}>{info.label}</span>
+                        <span className="block text-xs text-stone-500">{info.description}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* Rules */}
+      {step === 'Rules' && (
+        <section className="space-y-6 animate-fade-up">
+          <div className="space-y-2">
+            <Label>Difficulty</Label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {DIFFICULTY_SETTINGS.map((d) => {
+                const active = (settings.difficulty ?? 'mixed') === d.id
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => set({ difficulty: d.id })}
+                    aria-pressed={active}
+                    className={cn(
+                      'rounded-xl border px-2 py-2 text-sm transition-colors',
+                      active ? 'border-accent-line bg-accent-soft text-stone-50' : 'border-stone-800 bg-stone-800/40 text-stone-300 hover:border-stone-600',
+                    )}
+                  >
+                    {d.label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs text-stone-500">
+              {DIFFICULTY_SETTINGS.find((d) => d.id === (settings.difficulty ?? 'mixed'))?.hint} Your picks have {levels.easy} easy, {levels.medium} medium and {levels.hard} hard questions.
+              {['easy', 'medium', 'hard'].includes(settings.difficulty ?? 'mixed') && ' Only that level is used, so add categories if the game comes out short.'}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <Label>Questions</Label>
+              <span className="font-mono text-stone-100">{count}</span>
+            </div>
+            <input
+              type="range"
+              min={MIN_QUESTIONS}
+              max={maxQ}
+              value={count}
+              onChange={(e) => set({ questionCount: Number(e.target.value) })}
+              disabled={pool < MIN_QUESTIONS}
+              className="w-full range-dark"
+              aria-label="Number of questions"
+            />
+            <p className="text-xs text-stone-500">
+              {pool < MIN_QUESTIONS ? 'Not enough questions. Add a category or mode.' : `Up to ${pool} questions with this setup.`}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Time per question</Label>
+            <div className="flex rounded-xl border border-stone-800 bg-stone-800/40 p-1">
+              {TIMER_OPTIONS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => set({ timer: t })}
+                  className={cn('flex-1 rounded-lg py-1.5 text-sm transition-colors', settings.timer === t ? 'bg-stone-100 text-stone-900' : 'text-stone-400 hover:text-stone-200')}
+                >
+                  {t}s
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-stone-500">Order, Closest and Bluff rounds get a little extra.</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => set({ finalWager: !settings.finalWager })}
+            aria-pressed={settings.finalWager === true}
+            className={cn(
+              'w-full rounded-2xl border p-4 text-left transition-colors',
+              settings.finalWager ? 'border-accent-line bg-accent-soft' : 'border-stone-800 bg-stone-800/40 hover:border-stone-600',
+            )}
+          >
+            <span className="flex items-center justify-between gap-3">
+              <span className="text-base text-stone-100">Final Wager</span>
+              <span className={cn('w-9 h-5 rounded-full relative transition-colors flex-shrink-0', settings.finalWager ? 'bg-accent' : 'bg-stone-700')}>
+                <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all', settings.finalWager ? 'left-[18px]' : 'left-0.5')} />
+              </span>
             </span>
-          </span>
-        </label>
-      </section>
+            <span className="block mt-1 text-sm text-stone-400">
+              The last question is a bet. Everyone stakes up to half their points before seeing it.
+            </span>
+          </button>
+        </section>
+      )}
+
+      {/* Back and next */}
+      <div className="flex items-center justify-between pt-1">
+        {stepIndex > 0 ? (
+          <button type="button" onClick={() => setStep(STEPS[stepIndex - 1])} className="text-sm text-stone-500 hover:text-stone-300">
+            Back
+          </button>
+        ) : (
+          <span />
+        )}
+        {stepIndex < STEPS.length - 1 && (
+          <button
+            type="button"
+            onClick={() => setStep(STEPS[stepIndex + 1])}
+            className="rounded-full border border-stone-700 px-4 py-1.5 text-sm text-stone-200 hover:border-stone-500"
+          >
+            {stepIndex === 0 && activePreset ? 'Fine tune' : `Next: ${STEPS[stepIndex + 1]}`}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

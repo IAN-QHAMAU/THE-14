@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
+import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
 import { TimerBar } from '@/components/ui/Countdown'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { GetReady } from '@/components/game/GetReady'
@@ -203,6 +203,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-lg">{q.category === 'party' ? '🎉' : cat.emoji}</span>
+            {cat.group && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: GROUP_TINT[cat.group] }} />}
             <span className="text-xs text-stone-400 tracking-widest uppercase truncate">
               {round.round_number} / {game.total_questions} · {phase === 'wager' ? 'Final Wager' : isVote ? 'Find the real answer' : type.short}
             </span>
