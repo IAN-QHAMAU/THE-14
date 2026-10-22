@@ -45,7 +45,7 @@ export function Standings({ scores, lastReveal, myPlayerId, size = 'phone', limi
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <span className={cn('font-mono w-6 text-right', stage ? 'text-lg' : 'text-sm', isMe ? 'text-stone-500' : 'text-stone-400')}>{rank}</span>
-              <AvatarDisplay avatarId={s.avatar} size={stage ? 'md' : 'sm'} />
+              <AvatarDisplay avatarId={s.avatar} size={stage ? 'md' : 'sm'} mood={moved > 0 ? 'happy' : moved < 0 ? 'sad' : null} />
               <span className={cn('flex-1 min-w-0 truncate', stage ? 'text-xl' : 'text-sm')}>
                 {s.name}
                 {s.streak >= 3 && <span className="ml-2 text-xs opacity-70">🔥{s.streak}</span>}

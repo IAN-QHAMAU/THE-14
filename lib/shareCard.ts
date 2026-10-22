@@ -1,5 +1,5 @@
 'use client'
-import { getAvatarDataUri, legacyEmoji } from '@/components/ui/Avatar'
+import { getAvatarDataUri, legacyEmoji, type AvatarMood } from '@/components/ui/Avatar'
 import { parseAvatar } from '@/lib/avatar'
 import type { Award, PlayerScoreEntry, PlayerStats, PlayerTag } from '@/types'
 
@@ -86,8 +86,8 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   })
 }
 
-async function drawAvatar(ctx: CanvasRenderingContext2D, avatarId: string, x: number, y: number, size: number, font: string) {
-  const uri = await getAvatarDataUri(avatarId).catch(() => null)
+async function drawAvatar(ctx: CanvasRenderingContext2D, avatarId: string, x: number, y: number, size: number, font: string, mood: AvatarMood = null) {
+  const uri = await getAvatarDataUri(avatarId, mood).catch(() => null)
   const img = uri ? await loadImage(uri) : null
   ctx.save()
   ctx.beginPath()
@@ -359,7 +359,8 @@ async function playerCard(c: Ctx, input: ShareCardInput) {
   ctx.strokeStyle = rgba(accent, 0.45)
   ctx.lineWidth = 3
   ctx.stroke()
-  await drawAvatar(ctx, me.avatar, (W - hero) / 2, heroY, hero, font)
+  // Top three smile on their own card.
+  await drawAvatar(ctx, me.avatar, (W - hero) / 2, heroY, hero, font, rank <= 3 ? 'happy' : null)
 
   ctx.textAlign = 'center'
   ctx.fillStyle = C.soft

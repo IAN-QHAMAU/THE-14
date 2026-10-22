@@ -62,7 +62,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ### Players
 1. Go to `/join` on their phone
-2. Enter the game code and a name, then build an avatar (4 styles, colours, endless looks)
+2. Enter the game code and a name, then build an avatar (8 styles, colours, endless looks). Characters react during the game: they smile when you are right, sulk when you are wrong, sway gently in the lobby and cheer or droop as the standings move.
 3. Wait in the lobby until the GM starts
 4. Every question opens with a short "get ready" countdown that is synced across all phones
 5. Answer as fast as you can. Tap too fast and the game notices. Get it wrong after a speedy tap and you will hear about it.
@@ -273,3 +273,13 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 ```
+
+---
+
+## Credits
+
+Avatars are drawn with [DiceBear](https://www.dicebear.com):
+
+- Adventurer by Lisa Wischofsky, Big Smile by Ashley Seo, Micah by Micah Lanier, Toon Head by Johan Melin and Personas by Draftbit, all CC BY 4.0
+- Lorelei by Lisa Wischofsky and Open Peeps by Pablo Stanley, both CC0 1.0
+- Avataaars by Pablo Stanley, free for personal and commercial use

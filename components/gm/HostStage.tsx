@@ -40,7 +40,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
           {players.length === 0 && <p className="text-stone-500">Waiting for players.</p>}
           {players.map((p, i) => (
             <div key={p.id} className="flex flex-col items-center gap-1.5 w-20 animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
-              <AvatarDisplay avatarId={p.avatar} size="lg" mood={p.is_connected ? 'happy' : null} className={cn(!p.is_connected && 'opacity-40')} />
+              <AvatarDisplay avatarId={p.avatar} size="lg" idle={p.is_connected} style={{ animationDelay: `${-i * 0.9}s` }} className={cn(!p.is_connected && 'opacity-40')} />
               <span className={cn('text-sm truncate max-w-full', p.is_connected ? 'text-stone-300' : 'text-stone-500')}>
                 {p.name}
                 {!p.is_connected && <span className="block text-[11px] text-stone-600">away</span>}
@@ -187,7 +187,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
               key={p.id}
               avatarId={p.avatar}
               size="sm"
-              className={cn('ring-2 ring-stone-900 transition-opacity', answered.has(p.id) ? 'opacity-100' : 'opacity-25')}
+              className={cn('ring-2 ring-stone-900 transition-opacity', answered.has(p.id) ? 'opacity-100 motion-safe:animate-avatar-hop' : 'opacity-25')}
             />
           ))}
         </div>
