@@ -54,6 +54,8 @@ export function WaitingRoom({ game, players, myPlayer }: Props) {
                 <AvatarDisplay
                   avatarId={player.avatar}
                   size="md"
+                  idle={player.is_connected}
+                  style={{ animationDelay: `${-i * 0.9}s` }}
                   className={cn(player.id === myPlayer?.id && 'ring-2 ring-stone-900 ring-offset-2 ring-offset-stone-50', !player.is_connected && 'opacity-40')}
                 />
                 <span className="text-xs text-stone-600 truncate max-w-full">{player.name}</span>

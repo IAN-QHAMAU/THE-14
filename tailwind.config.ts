@@ -29,6 +29,10 @@ const config: Config = {
           '70%': { transform: 'translateY(0)' },
           '85%': { transform: 'translateY(-2px)' },
         },
+        'avatar-idle': {
+          '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+          '50%': { transform: 'translateY(-2px) rotate(-2deg)' },
+        },
         'avatar-droop': {
           '0%': { transform: 'rotate(0deg)' },
           '100%': { transform: 'rotate(-8deg) translateY(2px)' },
@@ -52,6 +56,7 @@ const config: Config = {
         'count-pop': 'count-pop 1000ms ease-out both',
         'avatar-hop': 'avatar-hop 700ms ease-out 1',
         'avatar-droop': 'avatar-droop 500ms ease-out forwards',
+        'avatar-idle': 'avatar-idle 3.6s ease-in-out infinite',
         'float-up': 'float-up 2200ms ease-out forwards',
         nudge: 'nudge 300ms ease-in-out 1',
         rise: 'rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both',

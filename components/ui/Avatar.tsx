@@ -11,32 +11,92 @@ import {
   type AvatarStyle,
 } from '@/lib/avatar'
 
-// Avatar artwork is large, so each style loads on first use.
-type Renderer = (seed: string, bg: string) => string
-const LOADERS: Record<AvatarStyle, () => Promise<unknown>> = {
-  adventurer: () => import('@dicebear/adventurer'),
-  lorelei: () => import('@dicebear/lorelei'),
-  bigSmile: () => import('@dicebear/big-smile'),
-  micah: () => import('@dicebear/micah'),
+export type AvatarMood = 'happy' | 'sad' | null
+
+// Avatar artwork is large, so each style loads on first use. Moods swap only
+// the face (mouth, eyes, brows), so the character keeps its hair and look and
+// actually smiles when you are right and sulks when you are not.
+type Options = Record<string, unknown>
+interface StyleDef {
+  load: () => Promise<unknown>
+  /** Only for newer styles; existing styles keep their look unchanged. */
+  base?: Options
+  happy: Options
+  sad: Options
 }
+const STYLES: Record<AvatarStyle, StyleDef> = {
+  adventurer: {
+    load: () => import('@dicebear/adventurer'),
+    happy: { mouth: ['variant23', 'variant24', 'variant26'] },
+    sad: { mouth: ['variant13', 'variant14'] },
+  },
+  lorelei: {
+    load: () => import('@dicebear/lorelei'),
+    happy: { mouth: ['happy01', 'happy02', 'happy04', 'happy07', 'happy09'] },
+    sad: { mouth: ['sad01', 'sad02', 'sad04', 'sad06'] },
+  },
+  bigSmile: {
+    load: () => import('@dicebear/big-smile'),
+    happy: { mouth: ['openedSmile', 'teethSmile', 'gapSmile'], eyes: ['cheery', 'starstruck'] },
+    sad: { mouth: ['openSad'], eyes: ['sad'] },
+  },
+  micah: {
+    load: () => import('@dicebear/micah'),
+    happy: { mouth: ['laughing', 'smile'], eyes: ['smiling'] },
+    sad: { mouth: ['sad', 'frown'], eyebrows: ['down'] },
+  },
+  openPeeps: {
+    load: () => import('@dicebear/open-peeps'),
+    base: { face: ['calm', 'cheeky', 'cute', 'smile', 'smileBig', 'explaining', 'driven', 'lovingGrin1'] },
+    happy: { face: ['smileLOL', 'smileBig', 'lovingGrin2', 'smileTeethGap'] },
+    sad: { face: ['concerned', 'concernedFear', 'tired'] },
+  },
+  toonHead: {
+    load: () => import('@dicebear/toon-head'),
+    base: { mouth: ['smile', 'laugh', 'agape'], eyebrows: ['raised', 'happy', 'neutral'] },
+    happy: { mouth: ['laugh'], eyes: ['happy'], eyebrows: ['happy'] },
+    sad: { mouth: ['sad'], eyes: ['humble'], eyebrows: ['sad'] },
+  },
+  avataaars: {
+    load: () => import('@dicebear/avataaars'),
+    base: {
+      mouth: ['default', 'smile', 'twinkle', 'serious'],
+      eyes: ['default', 'happy', 'side', 'squint', 'wink'],
+      eyebrows: ['defaultNatural', 'flatNatural', 'raisedExcitedNatural', 'upDownNatural'],
+    },
+    happy: { mouth: ['smile', 'twinkle'], eyes: ['happy'], eyebrows: ['raisedExcitedNatural'] },
+    sad: { mouth: ['sad', 'concerned'], eyes: ['cry'], eyebrows: ['sadConcernedNatural'] },
+  },
+  personas: {
+    load: () => import('@dicebear/personas'),
+    base: { mouth: ['smile', 'bigSmile', 'smirk', 'lips'], eyes: ['open', 'happy', 'wink'] },
+    happy: { mouth: ['bigSmile'], eyes: ['happy'] },
+    sad: { mouth: ['frown'] },
+  },
+}
+
+type Renderer = (seed: string, bg: string, mood: AvatarMood) => string
 const renderers = new Map<AvatarStyle, Promise<Renderer>>()
 const cache = new Map<string, string>()
 
 function loadRenderer(style: AvatarStyle): Promise<Renderer> {
   let p = renderers.get(style)
   if (!p) {
-    p = Promise.all([import('@dicebear/core'), LOADERS[style]()]).then(([core, mod]) => {
+    const def = STYLES[style]
+    p = Promise.all([import('@dicebear/core'), def.load()]).then(([core, mod]) => {
       const styleDef = mod as Parameters<typeof core.createAvatar>[0]
-      return (seed: string, bg: string) =>
-        core.createAvatar(styleDef, { seed, backgroundColor: [bg], radius: 50 }).toDataUri()
+      return (seed: string, bg: string, mood: AvatarMood) =>
+        core
+          .createAvatar(styleDef, { seed, backgroundColor: [bg], radius: 50, ...def.base, ...(mood ? def[mood] : null) })
+          .toDataUri()
     })
     renderers.set(style, p)
   }
   return p
 }
 
-function useAvatarUri(style: AvatarStyle | undefined, seed: string | undefined, bg: string | undefined) {
-  const key = style && seed && bg ? `${style}:${seed}:${bg}` : null
+function useAvatarUri(style: AvatarStyle | undefined, seed: string | undefined, bg: string | undefined, mood: AvatarMood = null) {
+  const key = style && seed && bg ? `${style}:${seed}:${bg}:${mood ?? ''}` : null
   const [uri, setUri] = useState<string | null>(key ? cache.get(key) ?? null : null)
 
   useEffect(() => {
@@ -52,7 +112,7 @@ function useAvatarUri(style: AvatarStyle | undefined, seed: string | undefined, 
     let alive = true
     loadRenderer(style)
       .then((render) => {
-        const out = render(seed, bg)
+        const out = render(seed, bg, mood)
         cache.set(key, out)
         if (alive) setUri(out)
       })
@@ -62,7 +122,7 @@ function useAvatarUri(style: AvatarStyle | undefined, seed: string | undefined, 
     return () => {
       alive = false
     }
-  }, [key, style, seed, bg])
+  }, [key, style, seed, bg, mood])
 
   return uri
 }
@@ -75,49 +135,54 @@ const SIZES = {
   xl: 'w-24 h-24 text-5xl',
 }
 
-export type AvatarMood = 'happy' | 'sad' | null
-
 export function AvatarDisplay({
   avatarId,
   size = 'md',
   mood = null,
+  idle = false,
   className,
+  style,
 }: {
   avatarId: string
   size?: keyof typeof SIZES
   mood?: AvatarMood
+  /** A slow, gentle sway, for avatars waiting around in the lobby. */
+  idle?: boolean
   className?: string
+  style?: React.CSSProperties
 }) {
   const parsed = parseAvatar(avatarId)
-  const uri = useAvatarUri(parsed?.style, parsed?.seed, parsed?.bg)
-  const moodClass = mood === 'happy' ? 'animate-avatar-hop' : mood === 'sad' ? 'animate-avatar-droop grayscale-[40%]' : ''
+  const base = useAvatarUri(parsed?.style, parsed?.seed, parsed?.bg)
+  const faced = useAvatarUri(parsed?.style, parsed?.seed, parsed?.bg, mood)
+  const uri = faced ?? base
+  const moodClass = mood === 'happy' ? 'motion-safe:animate-avatar-hop' : mood === 'sad' ? 'motion-safe:animate-avatar-droop grayscale-[40%]' : idle ? 'motion-safe:animate-avatar-idle' : ''
 
   if (parsed && !uri) {
-    return <span className={cn('inline-block rounded-full flex-shrink-0', SIZES[size], className)} style={{ backgroundColor: `#${parsed.bg}` }} />
+    return <span className={cn('inline-block rounded-full flex-shrink-0', SIZES[size], className)} style={{ ...style, backgroundColor: `#${parsed.bg}` }} />
   }
 
   if (!uri) {
     return (
-      <span className={cn('inline-flex items-center justify-center rounded-full bg-stone-100 flex-shrink-0', SIZES[size], moodClass, className)}>
+      <span className={cn('inline-flex items-center justify-center rounded-full bg-stone-100 flex-shrink-0', SIZES[size], moodClass, className)} style={style}>
         {LEGACY_AVATARS[avatarId] ?? '👤'}
       </span>
     )
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={uri} alt="" draggable={false} className={cn('rounded-full flex-shrink-0 select-none', SIZES[size], moodClass, className)} />
+    <img src={uri} alt="" draggable={false} className={cn('rounded-full flex-shrink-0 select-none', SIZES[size], moodClass, className)} style={style} />
   )
 }
 
 /** Data URI for an avatar, or null for legacy emoji avatars. Used by the share card. */
-export async function getAvatarDataUri(avatarId: string): Promise<string | null> {
+export async function getAvatarDataUri(avatarId: string, mood: AvatarMood = null): Promise<string | null> {
   const parsed = parseAvatar(avatarId)
   if (!parsed) return null
-  const key = `${parsed.style}:${parsed.seed}:${parsed.bg}`
+  const key = `${parsed.style}:${parsed.seed}:${parsed.bg}:${mood ?? ''}`
   const hit = cache.get(key)
   if (hit) return hit
   const render = await loadRenderer(parsed.style)
-  const out = render(parsed.seed, parsed.bg)
+  const out = render(parsed.seed, parsed.bg, mood)
   cache.set(key, out)
   return out
 }

@@ -12,7 +12,7 @@ import {
   getGameEvents,
   toScoreEntries,
 } from '@/lib/db/queries'
-import { getQuestionById, toPublicQuestion } from '@/lib/game/questions'
+import { getQuestionById, phaseAction, toPublicQuestion } from '@/lib/game/questions'
 import { createServerSupabase } from '@/lib/db/supabase'
 import { HEARTBEAT_MS, isActive } from '@/lib/presence'
 import type { GameStateResponse, Player } from '@/types'
@@ -79,13 +79,13 @@ export async function GET() {
   let answeredCount = 0
   if (round && ['active', 'voting'].includes(round.status)) {
     const actions = await getRoundActions(round.id)
-    const phaseType = round.data?.phase === 'write' ? 'bluff' : 'answer'
+    const phaseType = phaseAction(round.data?.phase)
     const done = new Set(actions.filter((a) => a.action_type === phaseType).map((a) => a.player_id))
     submissionStatus = Object.fromEntries(realPlayers.map((p) => [p.id, done.has(p.id)]))
     answeredCount = done.size
   }
 
-  const mine = round && !isGameMaster ? await getMyActions(round.id, playerId) : { answer: null, bluff: null }
+  const mine = round && !isGameMaster ? await getMyActions(round.id, playerId) : { answer: null, bluff: null, wager: null, pick: null }
 
   const reveal = round && game.status === 'question_result' ? await getRevealForRound(round.id) : null
   const lastReveal = game.status === 'leaderboard' || game.status === 'finished' ? await getLatestReveal(gameId) : null
@@ -108,6 +108,8 @@ export async function GET() {
     currentQuestion,
     myAnswer: mine.answer,
     myBluff: mine.bluff?.text ?? null,
+    myWager: mine.wager?.value ?? null,
+    myPick: mine.pick?.option_index ?? null,
     submissionStatus,
     answeredCount,
     reveal,

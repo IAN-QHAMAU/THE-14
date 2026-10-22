@@ -45,12 +45,13 @@ export function Standings({ scores, lastReveal, myPlayerId, size = 'phone', limi
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <span className={cn('font-mono w-6 text-right', stage ? 'text-lg' : 'text-sm', isMe ? 'text-stone-500' : 'text-stone-400')}>{rank}</span>
-              <AvatarDisplay avatarId={s.avatar} size={stage ? 'md' : 'sm'} />
+              <AvatarDisplay avatarId={s.avatar} size={stage ? 'md' : 'sm'} mood={moved > 0 ? 'happy' : moved < 0 ? 'sad' : null} />
               <span className={cn('flex-1 min-w-0 truncate', stage ? 'text-xl' : 'text-sm')}>
                 {s.name}
                 {s.streak >= 3 && <span className="ml-2 text-xs opacity-70">🔥{s.streak}</span>}
               </span>
               {gained > 0 && <span className={cn('font-mono text-xs', isMe ? 'text-emerald-700' : 'text-emerald-400')}>+{gained}</span>}
+              {gained < 0 && <span className={cn('font-mono text-xs', isMe ? 'text-rose-700' : 'text-rose-400')}>{gained}</span>}
               <span className={cn('w-8 text-xs text-right', moved > 0 ? 'text-emerald-500' : moved < 0 ? 'text-rose-400' : 'text-transparent')}>
                 {moved > 0 ? `▲${moved}` : moved < 0 ? `▼${-moved}` : '·'}
               </span>

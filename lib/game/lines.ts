@@ -7,9 +7,10 @@ const LINES = {
     'Fast. Very fast. We will see.',
     'You barely read that.',
     'Confident, are we?',
+    'Somebody had that ready.',
   ],
   fastRight: ['Speed demon.', 'Did not even need to think.', 'Fastest fingers in the room.', 'Quick and correct. Show off.'],
-  right: ['Nice one.', 'Clean.', 'Knew it.', 'Easy for you, apparently.', 'Correct. Carry on.'],
+  right: ['Nice one.', 'Clean.', 'Knew it.', 'Easy for you, apparently.', 'Correct. Carry on.', 'Textbook.'],
   onStreak: ['On a roll.', 'Keep it going.', 'Someone stop them.', 'Heating up.'],
   fastWrong: [
     'Bold of you to answer before reading.',
@@ -18,6 +19,7 @@ const LINES = {
     'You tapped like you knew. You did not.',
     'Confidence: high. Accuracy: low.',
     'Speed was not the problem there.',
+    'A speed run to the wrong answer.',
   ],
   wrong: [
     'Close. Well, not really.',
@@ -26,26 +28,41 @@ const LINES = {
     'Not quite. Shake it off.',
     'Bold choice. Wrong, but bold.',
     'Interesting pick.',
+    'That answer had confidence. Nothing else.',
   ],
-  slowWrong: ['All that thinking and still no.', 'You really took your time with that one.', 'Long think, wrong answer.'],
+  slowWrong: ['All that thinking and still no.', 'You really took your time with that one.', 'Long think, wrong answer.', 'The timer believed in you. Briefly.'],
   missed: [
     'Blink and you missed it.',
     'The timer won that round.',
     'Were you even here for that one?',
     'No answer is also an answer. Just not a good one.',
+    'The question waited. You did not show up.',
   ],
   lostStreak: ['And the streak is gone.', 'It was a good run while it lasted.', 'Streak over. Back to work.'],
   closeExact: ['Spot on. Unreal.', 'Exactly right. Suspicious.'],
   closeGood: ['Close enough to count.', 'Nearly there.', 'Not bad at all.'],
   closeMid: ['In the neighbourhood.', 'Not bad. Some points.', 'Warm, not hot.'],
-  closeFar: ['Not even close. Respectfully.', 'A brave estimate.', 'Somewhere in the right universe.'],
+  closeFar: ['Not even close. Respectfully.', 'A brave estimate.', 'Somewhere in the right universe.', 'That number came from somewhere. Not sure where.'],
   orderFull: ['Perfect order.', 'Every one in place.'],
   orderPartial: ['Some of it was right.', 'Half sorted.', 'A creative order.'],
-  orderNone: ['Not one in the right spot.', 'Shuffled, not sorted.'],
+  orderNone: ['Not one in the right spot.', 'Shuffled, not sorted.', 'Every single one wrong. Impressive, honestly.'],
   roomSided: ['You read the room.', 'The room agrees with you.'],
   roomAlone: ['The room did not agree.', 'You stood alone on that one.'],
   bluffFound: ['You found the real one.', 'Not fooled.'],
-  bluffFell: ['You fell for it.', 'Fooled. It happens.'],
+  bluffFell: ['You fell for it.', 'Fooled. It happens.', 'Your friends lie better than you thought.'],
+  // Lines that react to the room, not just your answer.
+  aloneWrong: ['Everyone else got that one.', 'The whole room knew that. Almost the whole room.', 'That one was for everybody. Nearly.'],
+  rareRight: ['Only a few got that. You were one.', 'The room missed it. You did not.', 'Quietly brilliant.'],
+  leaderWrong: ['Top of the table, bottom of this question.', 'Even the leader slips.', 'The crown wobbled a little.'],
+  lastRight: ['The comeback starts here.', 'Climbing. Slowly, but climbing.', 'Do not call it a comeback yet.'],
+  lostBigStreak: ['A great streak, gone in one tap.', 'That streak deserved a better ending.'],
+  fastestFirst: ['First in. Untouchable.', 'Nobody else stood a chance.', 'Fastest finger in the room.'],
+  fastestLate: ['Right, but someone beat you to it.', 'Correct. Just not first.', 'So close to the double.'],
+  syncRight: ['You read them perfectly.', 'In sync.', 'You know them too well.'],
+  syncWrong: ['Do you even know them?', 'Out of sync.', 'They surprised you.'],
+  syncNobody: ['Nobody saw that coming.', 'A complete mystery to everyone.'],
+  wagerWon: ['The bet paid off.', 'Bold, and right.'],
+  wagerLost: ['The bet did not land.', 'The house wins this time.'],
 } as const
 
 type LineKey = keyof typeof LINES
@@ -66,6 +83,14 @@ export function quickTapLine(seed: string) {
   return pickLine('quickTap', seed)
 }
 
+/** Final Wager: what happened to your bet. */
+function betLine(r: PlayerResult, seed: string) {
+  if (!r.wager) return undefined
+  return r.correct
+    ? `${pickLine('wagerWon', seed)} +${r.wager.toLocaleString()} from your bet.`
+    : `${pickLine('wagerLost', seed)} -${r.wager.toLocaleString()} from your bet.`
+}
+
 export interface ResultLine {
   headline: string
   sub?: string
@@ -76,16 +101,43 @@ export function resultLine(
   type: QuestionType,
   r: PlayerResult | undefined,
   seed: string,
-  opts: { timerMs: number; fellForNames?: string[] },
+  opts: {
+    timerMs: number
+    fellForNames?: string[]
+    /** Share of answering players who got it right, and how many answered. */
+    roomRight?: number
+    answered?: number
+    /** Your place before this question, out of how many players. */
+    rankBefore?: number
+    players?: number
+    soleRank?: boolean
+  },
 ): ResultLine {
-  if (!r || (!r.answered && !r.fooled)) {
-    if (type === 'mostlikely' || type === 'wouldrather') return { headline: 'No vote.', tone: 'neutral' }
-    return { headline: pickLine('missed', seed), sub: r?.lostStreak ? pickLine('lostStreak', seed) : undefined, tone: 'bad' }
+  // Sync: the player who went first sees how well the room read them.
+  if (r?.readBy !== undefined) {
+    return r.readBy
+      ? { headline: `${r.readBy} ${r.readBy === 1 ? 'person' : 'people'} read you right.`, tone: 'good' }
+      : { headline: pickLine('syncNobody', seed), tone: 'neutral' }
   }
 
-  const lost = r.lostStreak ? pickLine('lostStreak', seed) : undefined
+  if (!r || (!r.answered && !r.fooled)) {
+    if (type === 'mostlikely' || type === 'wouldrather') return { headline: 'No vote.', tone: 'neutral' }
+    const bet = r ? betLine(r, seed) : undefined
+    return { headline: pickLine('missed', seed), sub: bet ?? (r?.lostStreak ? pickLine('lostStreak', seed) : undefined), tone: 'bad' }
+  }
+
+  const lost = r.lostStreak ? pickLine(r.lostStreak >= 5 ? 'lostBigStreak' : 'lostStreak', seed) : undefined
+  const crowd = (opts.answered ?? 0) >= 3 && opts.roomRight !== undefined
+  const ranked = (opts.players ?? 0) >= 3 && opts.soleRank === true
+  const leader = ranked && opts.rankBefore === 1
+  const last = ranked && opts.rankBefore === opts.players
 
   switch (type) {
+    case 'sync':
+      return r.correct
+        ? { headline: pickLine('syncRight', seed), tone: 'good' }
+        : { headline: pickLine('syncWrong', seed), tone: 'neutral' }
+
     case 'mostlikely':
     case 'wouldrather':
       return r.points > 0
@@ -115,13 +167,18 @@ export function resultLine(
       }
 
     default: {
+      if (r.correct && type === 'fastest') {
+        return { headline: pickLine(r.first ? 'fastestFirst' : 'fastestLate', seed), sub: betLine(r, seed), tone: r.first ? 'good' : 'neutral' }
+      }
       if (r.correct) {
-        const headline = r.tooFast ? pickLine('fastRight', seed) : pickLine('right', seed)
-        return { headline, sub: r.streak >= 3 ? pickLine('onStreak', seed) : undefined, tone: 'good' }
+        const key: LineKey =
+          crowd && opts.roomRight! <= 0.25 ? 'rareRight' : last ? 'lastRight' : r.tooFast ? 'fastRight' : 'right'
+        return { headline: pickLine(key, seed), sub: betLine(r, seed) ?? (r.streak >= 3 ? pickLine('onStreak', seed) : undefined), tone: 'good' }
       }
       const slow = r.timeMs != null && r.timeMs > opts.timerMs * 0.7
-      const key: LineKey = r.tooFast ? 'fastWrong' : slow ? 'slowWrong' : 'wrong'
-      return { headline: pickLine(key, seed), sub: lost, tone: 'bad' }
+      const key: LineKey =
+        crowd && opts.roomRight! >= 0.75 ? 'aloneWrong' : leader ? 'leaderWrong' : r.tooFast ? 'fastWrong' : slow ? 'slowWrong' : 'wrong'
+      return { headline: pickLine(key, seed), sub: betLine(r, seed) ?? lost, tone: 'bad' }
     }
   }
 }

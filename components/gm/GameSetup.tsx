@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 
 export const DEFAULT_SETTINGS: GameSettings = {
   categories: ['general', 'movies', 'football', 'africa'],
-  types: ['choice', 'truefalse', 'emoji', 'closest'],
+  types: ['choice', 'truefalse', 'emoji', 'closest', 'oddone'],
   timer: 20,
   questionCount: 12,
   difficulty: 'mixed',
@@ -245,6 +245,21 @@ export function GameSetup({ settings, onChange }: Props) {
           </div>
           <p className="text-xs text-stone-500">Order, Closest and Bluff rounds get a little extra.</p>
         </div>
+
+        <label className="flex items-start gap-3 rounded-xl border border-stone-700 p-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.finalWager === true}
+            onChange={(e) => set({ finalWager: e.target.checked })}
+            className="mt-0.5 h-4 w-4 accent-stone-100"
+          />
+          <span className="space-y-0.5">
+            <span className="block text-sm text-stone-100">Final Wager</span>
+            <span className="block text-xs text-stone-500">
+              The last question is a bet. Everyone stakes up to half their points before seeing it, then wins or loses the bet.
+            </span>
+          </span>
+        </label>
       </section>
     </div>
   )

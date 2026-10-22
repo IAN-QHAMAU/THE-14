@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth/session'
 import { createServerSupabase } from '@/lib/db/supabase'
 import { getCurrentRound, getMyActions } from '@/lib/db/queries'
 import { getQuestionById, OPTION_TYPES } from '@/lib/game/questions'
-import { TOO_FAST_MS, normalizeText, type AnswerPayload } from '@/lib/game/scoring'
+import { TOO_FAST_MS, maxWager, normalizeText, type AnswerPayload } from '@/lib/game/scoring'
 import type { ActionType } from '@/types'
 
 /** Small allowance for network lag after the timer hits zero. */
@@ -38,7 +38,19 @@ export async function POST(req: NextRequest) {
   let actionType: ActionType = 'answer'
   const data = round.data ?? {}
 
-  if (question.type === 'bluff' && round.status === 'active') {
+  const spot = data.sync?.id
+  if (data.phase === 'wager') {
+    // Final Wager: bet before seeing the question.
+    const { data: me } = await createServerSupabase().from('players').select('score').eq('id', playerId).single()
+    const value = Math.round(Number(body.value))
+    if (!Number.isFinite(value)) return fail('Pick an amount.')
+    actionType = 'wager'
+    payload.value = Math.min(maxWager(me?.score ?? 0), Math.max(0, value))
+  } else if (data.phase === 'pick' && playerId !== spot) {
+    return fail('Hold on. Your turn is next.')
+  } else if (question.type === 'sync' && data.phase === 'vote' && playerId === spot) {
+    return fail('Sit back. They are guessing about you.')
+  } else if (question.type === 'bluff' && round.status === 'active') {
     const text = String(body.text ?? '').trim().slice(0, 60)
     if (!text) return fail('Write something first.')
     if (normalizeText(text) === normalizeText(question.answer)) {
@@ -72,9 +84,10 @@ export async function POST(req: NextRequest) {
       }
     }
     payload.option_index = idx
+    if (data.phase === 'pick') actionType = 'pick'
   }
 
-  payload.too_fast = OPTION_TYPES.includes(question.type) && timeTakenMs < TOO_FAST_MS
+  payload.too_fast = actionType === 'answer' && OPTION_TYPES.includes(question.type) && timeTakenMs < TOO_FAST_MS
 
   const { error } = await createServerSupabase().from('actions').insert({
     round_id: round.id,

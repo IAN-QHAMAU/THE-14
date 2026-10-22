@@ -52,6 +52,8 @@ export async function getMyActions(roundId: string, playerId: string) {
   return {
     answer: rows.find((r) => r.action_type === 'answer')?.payload ?? null,
     bluff: rows.find((r) => r.action_type === 'bluff')?.payload ?? null,
+    wager: rows.find((r) => r.action_type === 'wager')?.payload ?? null,
+    pick: rows.find((r) => r.action_type === 'pick')?.payload ?? null,
   }
 }
 

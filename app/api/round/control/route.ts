@@ -5,7 +5,7 @@ import { getGameById, getCurrentRound, getPlayers } from '@/lib/db/queries'
 import {
   setupGame,
   startNextQuestion,
-  startBluffVoting,
+  startSecondPhase,
   lockAndRevealQuestion,
   showLeaderboard,
   hasPendingRounds,
@@ -20,6 +20,7 @@ import {
   PICKABLE_CATEGORIES,
   TIMER_OPTIONS,
   DIFFICULTY_SETTINGS,
+  isFirstPhase,
   type DifficultySetting,
   type Category,
   type GameSettings,
@@ -39,7 +40,8 @@ function parseSettings(raw: unknown): GameSettings | null {
   const timer = TIMER_OPTIONS.includes(Number(r.timer)) ? Number(r.timer) : 20
   const questionCount = Math.min(MAX_QUESTIONS, Math.max(MIN_QUESTIONS, Number(r.questionCount) || 10))
   const difficulty = DIFFICULTY_SETTINGS.some((d) => d.id === r.difficulty) ? (r.difficulty as DifficultySetting) : 'mixed'
-  return { categories: [...new Set(categories)], types: [...new Set(types)], timer, questionCount, difficulty }
+  const finalWager = r.finalWager === true
+  return { categories: [...new Set(categories)], types: [...new Set(types)], timer, questionCount, difficulty, finalWager }
 }
 
 export async function POST(req: NextRequest) {
@@ -89,7 +91,7 @@ export async function POST(req: NextRequest) {
       if (!round || round.status !== 'active') {
         return NextResponse.json({ error: 'No question in progress.' }, { status: 400 })
       }
-      const { error } = await startBluffVoting(game, round)
+      const { error } = await startSecondPhase(game, round)
       if (error) return NextResponse.json({ error }, { status: 400 })
       return NextResponse.json({ success: true })
     }
@@ -99,8 +101,8 @@ export async function POST(req: NextRequest) {
       if (!round || !['active', 'voting'].includes(round.status)) {
         return NextResponse.json({ error: 'No question in progress.' }, { status: 400 })
       }
-      if (round.data?.phase === 'write') {
-        return NextResponse.json({ error: 'Start voting first.' }, { status: 400 })
+      if (isFirstPhase(round.data?.phase)) {
+        return NextResponse.json({ error: 'Move on to the next step first.' }, { status: 400 })
       }
       const { error } = await lockAndRevealQuestion(gameId, round)
       if (error) return NextResponse.json({ error }, { status: 400 })

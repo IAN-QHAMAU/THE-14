@@ -247,6 +247,82 @@ export function ClosestInput({
   )
 }
 
+// ─── Final Wager ───────────────────────────────────────────────────────────
+
+export function WagerInput({
+  score,
+  max,
+  disabled,
+  submitted,
+  onSubmit,
+}: {
+  score: number
+  max: number
+  disabled: boolean
+  submitted: number | null
+  onSubmit: (value: number) => void
+}) {
+  const [value, setValue] = useState<number>(submitted ?? Math.round(max / 2 / 10) * 10)
+  useEffect(() => {
+    if (submitted !== null) setValue(submitted)
+  }, [submitted])
+  const presets = [0, Math.round(max / 2 / 10) * 10, max]
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center space-y-1">
+        <p className="text-5xl font-light tabular-nums text-stone-900">{value.toLocaleString()}</p>
+        <p className="text-xs text-stone-400">
+          You have {score.toLocaleString()} points. Bet up to {max.toLocaleString()}.
+        </p>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={max}
+        step={10}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => setValue(Number(e.target.value))}
+        className="w-full"
+        aria-label="Your bet"
+      />
+      <div className="grid grid-cols-3 gap-2">
+        {presets.map((p, i) => (
+          <button
+            key={i}
+            type="button"
+            disabled={disabled}
+            onClick={() => setValue(p)}
+            className={cn(
+              'rounded-xl border py-2 text-sm transition-colors',
+              value === p ? 'border-stone-900 bg-stone-900 text-stone-50' : 'border-stone-200 text-stone-600',
+            )}
+          >
+            {i === 0 ? 'Nothing' : i === 1 ? 'Half' : 'All in'}
+          </button>
+        ))}
+      </div>
+      <Button size="lg" disabled={disabled} onClick={() => onSubmit(value)}>
+        {submitted !== null ? 'Bet placed' : 'Place bet'}
+      </Button>
+    </div>
+  )
+}
+
+// ─── Sync ─────────────────────────────────────────────────────────────
+
+/** Shown while it is someone else's turn to answer. */
+export function SyncWait({ avatar, title, text }: { avatar?: string; title: string; text: string }) {
+  return (
+    <div className="flex flex-col items-center text-center gap-4 py-8 animate-fade-up">
+      {avatar && <AvatarDisplay avatarId={avatar} size="xl" idle />}
+      <p className="text-lg font-medium text-stone-900">{title}</p>
+      <p className="text-sm text-stone-500 max-w-xs">{text}</p>
+    </div>
+  )
+}
+
 // ─── Put in order ──────────────────────────────────────────────────────────
 
 export function OrderPicker({

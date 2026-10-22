@@ -101,6 +101,26 @@ export function RevealBoard({ reveal, question, players, myPlayerId, myChoice, s
         <p className={cn('text-center', stage ? 'text-7xl' : 'text-5xl')}>{question.emoji}</p>
       )}
 
+      {reveal.sync_id && (
+        <div className="flex items-center gap-3 animate-fade-up">
+          {byId.get(reveal.sync_id) && (
+            <AvatarDisplay avatarId={byId.get(reveal.sync_id)!.avatar} size={stage ? 'lg' : 'md'} mood={winners.length ? 'happy' : null} />
+          )}
+          <p className={cn(strong, stage ? 'text-xl' : 'text-base')}>
+            {winners.length
+              ? `${byId.get(reveal.sync_id)?.name ?? 'They'} picked ${options[winners[0]]}`
+              : `${byId.get(reveal.sync_id)?.name ?? 'They'} did not answer in time`}
+          </p>
+        </div>
+      )}
+
+      {reveal.first_player_id && byId.get(reveal.first_player_id) && (
+        <div className="flex items-center gap-3 animate-fade-up">
+          <AvatarDisplay avatarId={byId.get(reveal.first_player_id)!.avatar} size={stage ? 'lg' : 'md'} mood="happy" />
+          <p className={cn(strong, stage ? 'text-xl' : 'text-base')}>{byId.get(reveal.first_player_id)!.name} got there first</p>
+        </div>
+      )}
+
       {isMostLikely && winners.length > 0 && (
         <div className="flex flex-col items-center gap-2 py-2 animate-fade-up">
           <div className="flex -space-x-3">
@@ -154,6 +174,23 @@ export function RevealBoard({ reveal, question, players, myPlayerId, myChoice, s
           )
         })}
       </div>
+
+      {reveal.wager && (() => {
+        const bets = Object.values(reveal.results).filter((r) => r.wager)
+        if (!bets.length) return null
+        const won = bets.filter((r) => r.correct).length
+        return (
+          <p className={cn(muted, stage ? 'text-lg' : 'text-sm')}>
+            {won} of {bets.length} {bets.length === 1 ? 'bet' : 'bets'} won.
+          </p>
+        )
+      })()}
+
+      {reveal.explain && (
+        <p className={cn('animate-fade-up', muted, stage ? 'text-lg' : 'text-sm')} style={{ animationDelay: `${options.length * 90 + 200}ms` }}>
+          {reveal.explain}
+        </p>
+      )}
     </div>
   )
 }

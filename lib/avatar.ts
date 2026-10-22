@@ -6,6 +6,10 @@ export const AVATAR_STYLES = [
   { id: 'lorelei', label: 'Lorelei' },
   { id: 'bigSmile', label: 'Smile' },
   { id: 'micah', label: 'Micah' },
+  { id: 'openPeeps', label: 'Peeps' },
+  { id: 'toonHead', label: 'Toon' },
+  { id: 'avataaars', label: 'Classic' },
+  { id: 'personas', label: 'Persona' },
 ] as const
 
 export type AvatarStyle = (typeof AVATAR_STYLES)[number]['id']

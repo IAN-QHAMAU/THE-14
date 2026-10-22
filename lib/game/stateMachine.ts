@@ -7,6 +7,7 @@ import {
   pickQuestions,
   shuffle,
   type GameSettings,
+  type Question,
   type RoundData,
 } from '@/lib/game/questions'
 import { buildBluffOptions, computeAwards, computePlayerStats, computeRanks, computeTags, gradeRound } from '@/lib/game/scoring'
@@ -21,6 +22,7 @@ export async function setupGame(gameId: string, settings: GameSettings) {
   const client = db()
   const questions = pickQuestions(settings)
   if (!questions.length) return { error: 'No questions match that setup.' }
+  const wager = settings.finalWager ? moveBetToEnd(questions) : false
 
   await client.from('rounds').delete().eq('game_id', gameId)
   await client.from('scores').delete().eq('game_id', gameId)
@@ -33,7 +35,7 @@ export async function setupGame(gameId: string, settings: GameSettings) {
       description: q.question,
       question_id: q.id,
       status: 'pending' as RoundStatus,
-      data: {},
+      data: wager && i === questions.length - 1 ? { wager: true } : {},
     })),
   )
   if (insertError) {
@@ -61,6 +63,19 @@ export async function setupGame(gameId: string, settings: GameSettings) {
 
   await logEvent(gameId, null, 'game_started', { questions: questions.length })
   return { error: null }
+}
+
+/** Questions with one clear right answer, good for a bet. */
+const BET_TYPES = ['choice', 'truefalse', 'oddone', 'emoji', 'picture']
+
+/** Final Wager: move a question with a clear right answer to the end. */
+function moveBetToEnd(questions: Question[]) {
+  for (let i = questions.length - 1; i >= 0; i--) {
+    if (!BET_TYPES.includes(questions[i].type)) continue
+    questions.push(...questions.splice(i, 1))
+    return true
+  }
+  return false
 }
 
 /** Back to the lobby with the same players, ready for another game. */
@@ -108,7 +123,7 @@ export async function startNextQuestion(game: Game, players: Player[]): Promise<
   if (!question) return null
 
   const timer = game.settings?.timer ?? 20
-  const data: RoundData = {}
+  const data: RoundData = round.data?.wager ? { wager: true, phase: 'wager' } : {}
   if (question.type === 'order') {
     let perm = shuffle(question.items.map((_, i) => i))
     // Never show the items already in the right order.
@@ -122,6 +137,10 @@ export async function startNextQuestion(game: Game, players: Player[]): Promise<
     data.players = (here.length ? here : everyone).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar }))
   }
   if (question.type === 'bluff') data.phase = 'write'
+  if (question.type === 'sync') {
+    data.sync = await pickSync(game.id, players)
+    data.phase = 'pick'
+  }
 
   // Claim the step: only one caller can move the game from this exact state.
   const { data: claimed } = await client
@@ -136,7 +155,7 @@ export async function startNextQuestion(game: Game, players: Player[]): Promise<
   await completeOpenRounds(game.id)
 
   const startsAt = new Date(Date.now() + GET_READY_MS)
-  const seconds = answerWindowSeconds(question.type, timer, question.type === 'bluff' ? 'write' : 'answer')
+  const seconds = answerWindowSeconds(question.type, timer, data.phase)
   const endsAt = new Date(startsAt.getTime() + seconds * 1000)
 
   await client
@@ -154,22 +173,45 @@ export async function startNextQuestion(game: Game, players: Player[]): Promise<
   return round
 }
 
-/** Bluff only: close the writing phase and open voting. */
-export async function startBluffVoting(game: Game, round: Round) {
+/** The player for a Sync round: someone here who has not had a turn yet. */
+async function pickSync(gameId: string, players: Player[]) {
+  const everyone = players.filter((p) => !p.is_game_master)
+  const here = everyone.filter((p) => isActive(p.last_seen_at))
+  const { data: past } = await db().from('rounds').select('data').eq('game_id', gameId).neq('status', 'pending')
+  const had = new Set((past ?? []).map((r) => (r.data as RoundData | null)?.sync?.id).filter(Boolean))
+  const pool = here.length ? here : everyone
+  const fresh = pool.filter((p) => !had.has(p.id))
+  const p = shuffle(fresh.length ? fresh : pool)[0]
+  return p ? { id: p.id, name: p.name, avatar: p.avatar } : undefined
+}
+
+/**
+ * Two step rounds: close the first step and open the second for everyone.
+ * Bluff goes from writing fakes to voting, Final Wager from bets to the
+ * question, and Sync from the player's own answer to everyone guessing.
+ */
+export async function startSecondPhase(game: Game, round: Round) {
   const question = getQuestionById(round.question_id)
-  if (!question || question.type !== 'bluff') return { error: 'Not a bluff round.' }
+  const phase = round.data?.phase
+  if (!question || (phase !== 'write' && phase !== 'wager' && phase !== 'pick')) return { error: 'Nothing to move on to.' }
 
-  const writes = (await getRoundActions(round.id)).filter((a) => a.action_type === 'bluff')
-  const options = buildBluffOptions(question, writes, round.id)
+  const actions = await getRoundActions(round.id)
+  const data: RoundData = { ...round.data, phase: 'vote' }
+  if (question.type === 'bluff' && phase === 'write') {
+    data.options = buildBluffOptions(question, actions.filter((a) => a.action_type === 'bluff'), round.id)
+  }
+  // Nobody to guess about if the player who goes first never answered.
+  if (phase === 'pick' && !actions.some((a) => a.action_type === 'pick')) return lockAndRevealQuestion(game.id, round)
+
   const startsAt = new Date(Date.now() + 1500)
-  const endsAt = new Date(startsAt.getTime() + answerWindowSeconds('bluff', game.settings?.timer ?? 20) * 1000)
+  const endsAt = new Date(startsAt.getTime() + answerWindowSeconds(question.type, game.settings?.timer ?? 20) * 1000)
 
-  // Only move on if the round is still in its writing phase.
+  // Only move on if the round is still in its first step.
   const { data: updated } = await db()
     .from('rounds')
     .update({
       status: 'voting' as RoundStatus,
-      data: { ...round.data, phase: 'vote', options },
+      data,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
     })
@@ -177,7 +219,7 @@ export async function startBluffVoting(game: Game, round: Round) {
     .eq('status', 'active')
     .select('id')
 
-  if (!updated?.length) return { error: 'Voting already started.' }
+  if (!updated?.length) return { error: 'Already moved on.' }
   await logEvent(game.id, round.id, 'voting_started', {})
   return { error: null }
 }
@@ -206,7 +248,8 @@ export async function lockAndRevealQuestion(gameId: string, round: Round) {
   const graded = gradeRound({ question, data: round.data ?? {}, answers, players })
 
   const before = Object.fromEntries(players.map((p) => [p.id, p.score]))
-  const after = Object.fromEntries(players.map((p) => [p.id, p.score + (graded.results[p.id]?.points ?? 0)]))
+  // A lost bet can take points away, but never below zero.
+  const after = Object.fromEntries(players.map((p) => [p.id, Math.max(0, p.score + (graded.results[p.id]?.points ?? 0))]))
 
   const scoreRows = players
     .filter((p) => (graded.results[p.id]?.points ?? 0) > 0)
