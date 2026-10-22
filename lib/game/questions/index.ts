@@ -9,6 +9,8 @@ import { HARD_TRUE_FALSE, HARD_EMOJI, HARD_CLOSEST, HARD_ORDER } from './hardTyp
 import { ANIME_PACKS } from './anime'
 import { FUN_QUESTIONS, FUN_TRUE_FALSE, FUN_EMOJI } from './fun'
 import { MORE_WOULD_RATHER, MORE_MOST_LIKELY, MORE_BLUFF } from './party'
+import { ODD_ONE_A, type RawOddOne } from './oddoneA'
+import { ODD_ONE_B } from './oddoneB'
 import { TRUE_FALSE, EMOJI, PICTURE, CLOSEST, ORDER, MOST_LIKELY, BLUFF } from './special'
 import {
   CATEGORIES,
@@ -29,6 +31,10 @@ export * from './schema'
 
 function normalize(q: RawChoiceQuestion): Question {
   return { ...q, type: q.type ?? 'choice' }
+}
+
+function oddOne(q: RawOddOne): Question {
+  return { ...q, type: 'oddone', question: 'Which one does not belong?', speedBonus: q.points / 2 }
 }
 
 export const ALL_QUESTIONS: Question[] = [
@@ -56,6 +62,8 @@ export const ALL_QUESTIONS: Question[] = [
   ...MORE_WOULD_RATHER,
   ...MORE_MOST_LIKELY,
   ...MORE_BLUFF,
+  ...ODD_ONE_A.map(oddOne),
+  ...ODD_ONE_B.map(oddOne),
   ...TRUE_FALSE,
   ...EMOJI,
   ...PICTURE,
