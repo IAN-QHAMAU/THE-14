@@ -8,6 +8,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      colors: {
+        // THE 14's one accent: warm amber, like lamp light at a game night.
+        accent: { DEFAULT: '#F2A541', soft: '#F2A5411f', line: '#F2A54159', deep: '#C9822A', ink: '#2B1D0A' },
+      },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
@@ -32,6 +36,11 @@ const config: Config = {
           '80%': { transform: 'translateY(-3%) scale(0.99, 1.02)' },
         },
         // Turns its head slowly in 3D and breathes.
+        'seat-in': {
+          '0%': { opacity: '0', transform: 'translateY(10px) scale(0.6)' },
+          '60%': { opacity: '1', transform: 'translateY(-4px) scale(1.08)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
         'avatar-idle': {
           '0%, 100%': { transform: 'perspective(320px) rotateY(-14deg) rotateX(2deg) translateY(0) scale(1)' },
           '50%': { transform: 'perspective(320px) rotateY(14deg) rotateX(-3deg) translateY(-3%) scale(1.03)' },
@@ -62,6 +71,7 @@ const config: Config = {
         'avatar-hop': 'avatar-hop 800ms cubic-bezier(0.3, 0.7, 0.4, 1) 1',
         'avatar-droop': 'avatar-droop 900ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards',
         'avatar-idle': 'avatar-idle 4.8s ease-in-out infinite',
+        'seat-in': 'seat-in 600ms cubic-bezier(0.3, 0.7, 0.4, 1) both',
         'float-up': 'float-up 2200ms ease-out forwards',
         nudge: 'nudge 300ms ease-in-out 1',
         rise: 'rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both',

@@ -9,8 +9,8 @@ import { Standings } from '@/components/game/Standings'
 import { Podium } from '@/components/game/Podium'
 import { ShareCard } from '@/components/game/ShareCard'
 import { PromptExtras } from '@/components/game/answers'
-import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
-import { useState } from 'react'
+import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
+import { useEffect, useState } from 'react'
 import { useServerNow } from '@/lib/clock'
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
@@ -27,26 +27,55 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 
   // ── Lobby ────────────────────────────────────────────────────────────────
   if (game.status === 'waiting') {
+    const seats = Math.max(players.length, game.max_players ?? 14)
+    const here = players.filter((p) => p.is_connected).length
     return (
-      <div className="text-center space-y-10 animate-fade-in">
-        <div className="space-y-3">
-          <p className="text-sm text-stone-400">
-            Join at <span className="text-stone-200">{joinUrl}</span> with code
-          </p>
-          <p className="font-mono text-6xl md:text-8xl tracking-[0.2em] text-stone-50">{game.game_code}</p>
-          <InviteLink code={game.game_code} />
+      <div className="w-full max-w-4xl mx-auto space-y-10 animate-fade-in">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
+          <JoinQr code={game.game_code} />
+          <div className="text-center md:text-left space-y-3">
+            <p className="text-sm text-stone-400">
+              Scan, or go to <span className="text-stone-200">{joinUrl}</span>
+            </p>
+            <p className="font-mono text-6xl md:text-8xl tracking-[0.18em] text-stone-50 leading-none">{game.game_code}</p>
+            <InviteLink code={game.game_code} />
+          </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-4 max-w-2xl mx-auto min-h-[5rem]">
-          {players.length === 0 && <p className="text-stone-500">Waiting for players.</p>}
-          {players.map((p, i) => (
-            <div key={p.id} className="flex flex-col items-center gap-1.5 w-20 animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
-              <AvatarDisplay avatarId={p.avatar} size="lg" idle={p.is_connected} style={{ animationDelay: `${-i * 0.9}s` }} className={cn(!p.is_connected && 'opacity-40')} />
-              <span className={cn('text-sm truncate max-w-full', p.is_connected ? 'text-stone-300' : 'text-stone-500')}>
-                {p.name}
-                {!p.is_connected && <span className="block text-[11px] text-stone-600">away</span>}
-              </span>
-            </div>
-          ))}
+
+        <div className="space-y-4">
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="text-stone-400">
+              <span className="text-stone-100 font-medium">{players.length}</span> of {seats} joined
+            </span>
+            <span className={cn('transition-colors', here >= 2 ? 'text-accent' : 'text-stone-500')}>
+              {here === 0 ? 'Waiting for the first player' : here === 1 ? 'One more and you can start' : 'Ready when you are'}
+            </span>
+          </div>
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-x-3 gap-y-5">
+            {Array.from({ length: seats }).map((_, i) => {
+              const p = players[i]
+              if (!p) {
+                return (
+                  <div key={`seat-${i}`} className="flex flex-col items-center gap-1.5">
+                    <span className={cn('rounded-full border border-dashed border-stone-700/80', size === 'stage' ? 'w-16 h-16' : 'w-12 h-12')} />
+                    <span className="text-xs text-stone-700">{i + 1}</span>
+                  </div>
+                )
+              }
+              return (
+                <div key={p.id} className="flex flex-col items-center gap-1.5 min-w-0 animate-seat-in">
+                  <AvatarDisplay
+                    avatarId={p.avatar}
+                    size={size === 'stage' ? 'lg' : 'md'}
+                    idle={p.is_connected}
+                    style={{ animationDelay: `${-i * 0.9}s` }}
+                    className={cn(!p.is_connected && 'opacity-40')}
+                  />
+                  <span className={cn('text-sm truncate max-w-full', p.is_connected ? 'text-stone-200' : 'text-stone-500')}>{p.name}</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     )
@@ -141,10 +170,18 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
   // ── Live question ────────────────────────────────────────────────────────
   const answered = new Set(Object.entries(state.submissionStatus).filter(([, v]) => v).map(([k]) => k))
 
+  const tint = cat.group ? GROUP_TINT[cat.group] : '#F2A541'
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8 animate-fade-in">
+    <div className="relative isolate w-full max-w-4xl mx-auto space-y-8 animate-fade-in">
+      {/* A faint glow in the category's colour, so the room learns the colours. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-x-24 -top-32 h-80 -z-10 opacity-60 blur-3xl"
+        style={{ background: `radial-gradient(closest-side, ${tint}2e, transparent)` }}
+      />
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-stone-400">
-        <span>
+        <span className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tint }} />
           {q.category === 'party' ? '🎉' : cat.emoji} {q.category === 'party' ? type.label : cat.label} · Question {round.round_number} of {game.total_questions}
         </span>
         <span>
@@ -224,6 +261,26 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 }
 
 /** Join link with the code already filled in, ready to paste in the group chat. */
+/** Scan to join: opens the join page with the code already filled in. */
+function JoinQr({ code }: { code: string }) {
+  const [svg, setSvg] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    import('qrcode')
+      .then((QR) => QR.toString(`${window.location.origin}/join?code=${code}`, { type: 'svg', margin: 0, color: { dark: '#1c1917', light: '#00000000' } }))
+      .then((out) => alive && setSvg(out))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [code])
+  return (
+    <div className="rounded-3xl bg-stone-50 p-4 shadow-[0_0_0_6px_rgba(242,165,65,0.18)] flex-shrink-0">
+      <div className="w-36 h-36 md:w-44 md:h-44 [&>svg]:w-full [&>svg]:h-full" aria-label="QR code to join" dangerouslySetInnerHTML={svg ? { __html: svg } : undefined} />
+    </div>
+  )
+}
+
 function InviteLink({ code }: { code: string }) {
   const [note, setNote] = useState('')
   const text = `Join my THE 14 game. Code ${code}`
@@ -255,7 +312,7 @@ function InviteLink({ code }: { code: string }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-2">
       <button type="button" onClick={copy} className="rounded-full border border-stone-700 px-4 py-1.5 text-sm text-stone-300 hover:bg-stone-800">
         Copy link
       </button>

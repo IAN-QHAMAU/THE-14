@@ -8,7 +8,7 @@ import { SoundToggle } from '@/components/ui/SoundToggle'
 import { VoiceHeaderButton, useSpeaking } from '@/components/voice/Voice'
 import { VoiceProvider } from '@/lib/voice/VoiceProvider'
 import { HostStage } from '@/components/gm/HostStage'
-import { DEFAULT_SETTINGS, GameSetup, poolSize } from '@/components/gm/GameSetup'
+import { DEFAULT_SETTINGS, GameSetup, poolSize, setupSummary } from '@/components/gm/GameSetup'
 import { ReactionLayer, useReactions } from '@/components/game/Reactions'
 import { serverNow, useServerNow } from '@/lib/clock'
 import { sound } from '@/lib/sound'
@@ -363,7 +363,7 @@ export default function GMControlPage() {
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
         {/* Stage */}
         <section className="min-w-0 px-4 md:px-10 py-6 md:py-12 flex flex-col items-center justify-center min-h-[50vh] lg:sticky lg:top-0 lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto">
           <HostStage state={state} joinUrl={joinUrl} />
@@ -420,6 +420,13 @@ export default function GMControlPage() {
           {autoAt && (
             <span className="text-xs text-stone-500 tabular-nums">Next in {Math.max(1, Math.ceil((autoAt - now) / 1000))}s</span>
           )}
+          {game.status === 'waiting' && !error && (
+            <p className="hidden sm:block text-sm text-stone-400 truncate">
+              {setupSummary(settings, Math.min(settings.questionCount, pool))}
+              <span className="text-stone-600"> · </span>
+              {realPlayers.length} {realPlayers.length === 1 ? 'player' : 'players'}
+            </p>
+          )}
           <div className="flex-1 text-right text-sm text-rose-400 truncate">{error}</div>
           <div className="flex gap-2 w-full sm:w-auto">
           {secondary && (
@@ -439,7 +446,7 @@ export default function GMControlPage() {
           )}
           {primary && (
             <Button
-              className="flex-[2] sm:flex-none bg-stone-50 text-stone-900 hover:bg-stone-200 sm:min-w-[10rem]"
+              className="flex-[2] sm:flex-none bg-accent text-accent-ink hover:bg-accent-deep disabled:bg-stone-700 disabled:text-stone-400 sm:min-w-[10rem]"
               loading={loading === primary.action}
               disabled={primary.disabled}
               onClick={() => {
@@ -461,7 +468,7 @@ export default function GMControlPage() {
 function Switch({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
     <button type="button" onClick={onClick} className="flex items-center gap-2 text-xs text-stone-400 px-2 py-2" aria-pressed={on}>
-      <span className={cn('w-7 h-4 rounded-full relative transition-colors', on ? 'bg-emerald-600' : 'bg-stone-700')}>
+      <span className={cn('w-7 h-4 rounded-full relative transition-colors', on ? 'bg-accent' : 'bg-stone-700')}>
         <span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', on ? 'left-3.5' : 'left-0.5')} />
       </span>
       {label}

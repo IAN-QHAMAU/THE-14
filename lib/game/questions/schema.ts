@@ -169,6 +169,15 @@ export function isGradedType(type: QuestionType) {
 
 export type CategoryGroup = 'brain' | 'pop' | 'sports' | 'local' | 'lifestyle'
 
+/** Soft colour per group, used as a tint on cards and question screens. */
+export const GROUP_TINT: Record<CategoryGroup, string> = {
+  brain: '#7FA7F5',
+  pop: '#F28DB2',
+  sports: '#6CCB8B',
+  local: '#E9B949',
+  lifestyle: '#B49AF0',
+}
+
 export interface CategoryInfo {
   label: string
   emoji: string
