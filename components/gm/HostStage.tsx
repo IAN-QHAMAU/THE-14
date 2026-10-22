@@ -85,8 +85,17 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 
   const cat = CATEGORIES[q.category]
   const type = GAME_TYPES[q.type]
-  const isWrite = round.data?.phase === 'write'
+  const phase = round.data?.phase
+  const isWrite = phase === 'write'
   const isVote = q.type === 'bluff' && !isWrite
+  const spot = round.data?.sync
+  const readyLabel =
+    phase === 'wager' ? 'Final Wager'
+    : round.data?.wager ? 'Final question'
+    : isVote ? 'Voting time'
+    : phase === 'pick' ? `${spot?.name ?? 'Someone'} goes first`
+    : q.type === 'sync' ? 'Time to guess'
+    : undefined
 
   // ── Reveal ───────────────────────────────────────────────────────────────
   if (game.status === 'question_result' && state.reveal) {
@@ -124,7 +133,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         total={game.total_questions}
         startsAt={round.starts_at}
         size={size}
-        label={isVote ? 'Voting time' : undefined}
+        label={readyLabel}
       />
     )
   }
@@ -139,17 +148,30 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
           {q.category === 'party' ? '🎉' : cat.emoji} {q.category === 'party' ? type.label : cat.label} · Question {round.round_number} of {game.total_questions}
         </span>
         <span>
-          {isWrite ? 'Write a fake answer' : isVote ? 'Find the real answer' : type.short}
+          {isWrite ? 'Write a fake answer' : isVote ? 'Find the real answer' : phase === 'wager' ? 'Final Wager' : type.short}
         </span>
       </div>
 
       {round.starts_at && round.ends_at && <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} dark ticking />}
 
-      <h2 className="text-3xl md:text-5xl font-light text-stone-50 leading-tight">{q.question}</h2>
+      {spot && (
+        <div className="flex items-center gap-4">
+          <AvatarDisplay avatarId={spot.avatar} size="xl" idle />
+          <p className="text-xl text-stone-300">{spot.name} goes first</p>
+        </div>
+      )}
+
+      <h2 className="text-3xl md:text-5xl font-light text-stone-50 leading-tight">
+        {phase === 'wager' ? `Last question. ${q.category === 'party' ? type.label : cat.label}.` : q.question}
+      </h2>
 
       <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} size={size} />
 
-      {isWrite ? (
+      {phase === 'wager' ? (
+        <p className="text-lg text-stone-400">Everyone is placing a bet before they see the question. Win it or lose it.</p>
+      ) : phase === 'pick' ? (
+        <p className="text-lg text-stone-400">{spot?.name ?? 'They'} is answering on their phone. Everyone else guesses next.</p>
+      ) : isWrite ? (
         <p className="text-lg text-stone-400">Players are writing their fakes on their phones.</p>
       ) : q.type === 'closest' ? (
         <p className="text-lg text-stone-400">
@@ -192,7 +214,9 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
           ))}
         </div>
         <span className="text-sm text-stone-400">
-          {state.answeredCount} of {players.length} {isWrite ? 'written' : 'answered'}
+          {phase === 'pick'
+            ? `Waiting for ${spot?.name ?? 'them'}`
+            : `${state.answeredCount} of ${spot ? Math.max(1, players.length - 1) : players.length} ${isWrite ? 'written' : phase === 'wager' ? 'bets in' : 'answered'}`}
         </span>
       </div>
     </div>

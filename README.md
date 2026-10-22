@@ -82,11 +82,15 @@ Open [http://localhost:3000](http://localhost:3000)
 | Closest Wins | Guess a number with a slider. Closest gets the most points. |
 | Put in Order | Tap four items in the right order |
 | Odd One Out | Four things, one does not belong. The reveal says why. |
+| Fastest Finger | Classic questions where only the first right answer scores, and it scores double. |
 | Most Likely To | Party mode. Vote for a player. Side with the room to score. |
 | Bluff | Party mode. Everyone writes a fake answer, then tries to find the real one. Points for every player your fake fools. |
 | Would You Rather | Party mode. Pick one of two options. Side with the room to score. Worth half points, since it is a matter of taste. |
+| Sync | Party mode. How in sync is the room? Try it and see. |
 
 Party rounds are capped at about one in six questions and never open the game.
+
+**Final Wager:** a switch in setup. The last question becomes a bet: everyone stakes up to half their points (at least 200) before seeing it, then wins or loses the bet. Scores never drop below zero.
 
 ---
 

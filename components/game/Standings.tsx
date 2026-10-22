@@ -51,6 +51,7 @@ export function Standings({ scores, lastReveal, myPlayerId, size = 'phone', limi
                 {s.streak >= 3 && <span className="ml-2 text-xs opacity-70">🔥{s.streak}</span>}
               </span>
               {gained > 0 && <span className={cn('font-mono text-xs', isMe ? 'text-emerald-700' : 'text-emerald-400')}>+{gained}</span>}
+              {gained < 0 && <span className={cn('font-mono text-xs', isMe ? 'text-rose-700' : 'text-rose-400')}>{gained}</span>}
               <span className={cn('w-8 text-xs text-right', moved > 0 ? 'text-emerald-500' : moved < 0 ? 'text-rose-400' : 'text-transparent')}>
                 {moved > 0 ? `▲${moved}` : moved < 0 ? `▼${-moved}` : '·'}
               </span>

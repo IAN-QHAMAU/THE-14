@@ -11,6 +11,8 @@ export type QuestionType =
   | 'bluff'
   | 'wouldrather'
   | 'oddone'
+  | 'fastest'
+  | 'sync'
 
 export type Category =
   // Brain
@@ -117,6 +119,22 @@ export interface OddOneQuestion extends BaseQuestion {
   why: string
 }
 
+/** A Classic question played as Fastest Finger: only the first right answer scores. */
+export interface FastestQuestion extends BaseQuestion {
+  type: 'fastest'
+  options: string[]
+  correct: number
+}
+
+export interface SyncQuestion extends BaseQuestion {
+  type: 'sync'
+  /** Asked to everyone else, with {name} for the player who goes first. */
+  question: string
+  /** The same question asked to the player who goes first. */
+  self: string
+  options: string[]
+}
+
 export interface WouldRatherQuestion extends BaseQuestion {
   type: 'wouldrather'
   /** Exactly two choices. */
@@ -126,6 +144,8 @@ export interface WouldRatherQuestion extends BaseQuestion {
 export type Question =
   | WouldRatherQuestion
   | OddOneQuestion
+  | FastestQuestion
+  | SyncQuestion
   | ChoiceQuestion
   | EmojiQuestion
   | PictureQuestion
@@ -138,11 +158,11 @@ export type Question =
 export type RawChoiceQuestion = Omit<ChoiceQuestion, 'type'> & { type?: 'choice' | 'truefalse' }
 
 /** Types that use the tap-an-option answer pad. */
-export const OPTION_TYPES: QuestionType[] = ['choice', 'truefalse', 'emoji', 'picture', 'oddone']
+export const OPTION_TYPES: QuestionType[] = ['choice', 'truefalse', 'emoji', 'picture', 'oddone', 'fastest']
 
 /** Types where a right answer exists and streaks count. */
 export function isGradedType(type: QuestionType) {
-  return type !== 'mostlikely' && type !== 'wouldrather'
+  return type !== 'mostlikely' && type !== 'wouldrather' && type !== 'sync'
 }
 
 // ─── Categories ────────────────────────────────────────────────────────────
@@ -238,9 +258,11 @@ export const GAME_TYPES: Record<QuestionType, GameTypeInfo> = {
   closest:    { label: 'Closest Wins',       short: 'Closest number',    description: 'Guess a number. Nearest gets the most.' },
   order:      { label: 'Put in Order',       short: 'Put in order',      description: 'Tap four items in the right order.' },
   oddone:     { label: 'Odd One Out',        short: 'Spot the odd one',  description: 'Four things. One does not belong.' },
+  fastest:    { label: 'Fastest Finger',     short: 'First right answer wins', description: 'Only the first right answer scores, and it scores double.' },
   mostlikely: { label: 'Most Likely To',     short: 'Vote a player',     description: 'Vote for a player. Side with the room.', party: true },
   bluff:      { label: 'Bluff',              short: 'Write a fake',      description: 'Write a fake answer, then find the real one.', party: true },
   wouldrather: { label: 'Would You Rather', short: 'Pick a side',       description: 'Two choices. Side with the room to score.', party: true },
+  sync:       { label: 'Sync',               short: 'Are you in sync?',  description: 'How in sync is the room? You will see.', party: true },
 }
 
 export const ALL_TYPES = Object.keys(GAME_TYPES) as QuestionType[]
@@ -257,6 +279,8 @@ export interface GameSettings {
   voiceQuiet?: boolean
   /** Voice: backup group call link (WhatsApp, Meet, Discord). */
   callLink?: string
+  /** The last question becomes a bet. */
+  finalWager?: boolean
 }
 
 export const TIMER_OPTIONS = [10, 20, 30]
@@ -280,6 +304,8 @@ export interface PublicQuestion {
   step?: number
   unit?: string
   hint?: string
+  /** Sync: the question as asked to the player who goes first. */
+  self?: string
 }
 
 // ─── Round data stored on rounds.data ──────────────────────────────────────
@@ -289,8 +315,27 @@ export interface RoundData {
   perm?: number[]
   /** mostlikely: the players you can vote for */
   players?: { id: string; name: string; avatar: string }[]
-  /** bluff: current phase and, in vote phase, the shuffled options */
-  phase?: 'write' | 'vote'
+  /**
+   * Two step rounds. The first step is 'write' (Bluff fakes), 'wager' (Final
+   * Wager bets) or 'pick' (Sync answer); then 'vote' for everyone else.
+   */
+  phase?: 'write' | 'wager' | 'pick' | 'vote'
+  /** bluff: the shuffled options in the vote phase */
   options?: string[]
+  /** The last question of a Final Wager game. */
+  wager?: boolean
+  /** sync: the player who goes first */
+  sync?: { id: string; name: string; avatar: string }
+}
+
+export type FirstPhase = 'write' | 'wager' | 'pick'
+
+export function isFirstPhase(phase: RoundData['phase']): phase is FirstPhase {
+  return phase === 'write' || phase === 'wager' || phase === 'pick'
+}
+
+/** Which action a player submits in each phase. */
+export function phaseAction(phase: RoundData['phase']): 'answer' | 'bluff' | 'wager' | 'pick' {
+  return phase === 'write' ? 'bluff' : phase === 'wager' ? 'wager' : phase === 'pick' ? 'pick' : 'answer'
 }
 

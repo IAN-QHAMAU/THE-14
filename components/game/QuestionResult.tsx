@@ -66,10 +66,10 @@ export function QuestionResult({ state, onReact }: Props) {
             <p className="text-lg font-medium leading-snug">{line.headline}</p>
             {line.sub && <p className="text-sm opacity-70 mt-0.5">{line.sub}</p>}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs opacity-80">
-              <span className="font-mono">{r?.points ? `+${r.points}` : '+0'}</span>
+              <span className="font-mono">{r && r.points < 0 ? `${r.points}` : `+${r?.points ?? 0}`}</span>
               {r?.streakBonus ? <span>🔥 {r.streak} in a row, +{r.streakBonus}</span> : null}
               {r?.tooFast && r.correct === false ? <span>Too fast</span> : null}
-              {r?.timeMs != null && reveal.type !== 'mostlikely' && reveal.type !== 'wouldrather' && reveal.type !== 'bluff' ? <span>{(r.timeMs / 1000).toFixed(1)}s</span> : null}
+              {r?.timeMs != null && reveal.type !== 'mostlikely' && reveal.type !== 'wouldrather' && reveal.type !== 'bluff' && reveal.type !== 'sync' ? <span>{(r.timeMs / 1000).toFixed(1)}s</span> : null}
             </div>
           </div>
         </section>

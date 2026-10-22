@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS, GameSetup, poolSize } from '@/components/gm/GameSetup
 import { ReactionLayer, useReactions } from '@/components/game/Reactions'
 import { serverNow, useServerNow } from '@/lib/clock'
 import { sound } from '@/lib/sound'
-import { MIN_QUESTIONS, PICKABLE_CATEGORIES, ALL_TYPES, type GameSettings } from '@/lib/game/questions'
+import { MIN_QUESTIONS, PICKABLE_CATEGORIES, ALL_TYPES, isFirstPhase, type GameSettings } from '@/lib/game/questions'
 import { formatTime, cn } from '@/lib/utils'
 
 const SETTINGS_KEY = 'the14_gm_settings'
@@ -45,6 +45,7 @@ function loadSettings(): GameSettings {
       timer: s.timer ?? 20,
       questionCount: s.questionCount ?? 12,
       difficulty: s.difficulty ?? 'mixed',
+      finalWager: s.finalWager === true,
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -177,10 +178,15 @@ export default function GMControlPage() {
     if (autoFired.current === key) return
     // Players who have gone away do not hold up the reveal.
     const here = realPlayers.filter((p) => p.is_connected).length || realPlayers.length
-    const allIn = here > 0 && state.answeredCount >= here
+    // Sync: first only the player who goes first answers, then everyone else.
+    const spot = round.data?.sync?.id
+    const allIn =
+      phase === 'pick' ? Boolean(spot && state.submissionStatus[spot])
+      : spot ? state.answeredCount >= Math.max(1, here - 1)
+      : here > 0 && state.answeredCount >= here
     const started = round.starts_at ? serverNow() >= Date.parse(round.starts_at) : true
     const delay = allIn && started ? 1200 : Math.max(0, Date.parse(round.ends_at) - serverNow() + 800)
-    const action = phase === 'write' ? 'start_voting' : 'lock_question'
+    const action = isFirstPhase(phase) ? 'start_voting' : 'lock_question'
     const t = setTimeout(() => {
       autoFired.current = key
       void control(action, undefined, true)
@@ -249,7 +255,11 @@ export default function GMControlPage() {
       primary = { label: 'Start question 1', action: 'next_question' }
       break
     case 'active':
-      primary = phase === 'write' ? { label: 'Start voting', action: 'start_voting' } : { label: 'Reveal answer', action: 'lock_question' }
+      primary =
+        phase === 'write' ? { label: 'Start voting', action: 'start_voting' }
+        : phase === 'wager' ? { label: 'Show the question', action: 'start_voting' }
+        : phase === 'pick' ? { label: 'Start guessing', action: 'start_voting' }
+        : { label: 'Reveal answer', action: 'lock_question' }
       break
     case 'question_result':
       primary = { label: isLast ? 'Final results' : 'Next question', action: 'next_question' }

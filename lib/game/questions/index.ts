@@ -11,6 +11,7 @@ import { FUN_QUESTIONS, FUN_TRUE_FALSE, FUN_EMOJI } from './fun'
 import { MORE_WOULD_RATHER, MORE_MOST_LIKELY, MORE_BLUFF } from './party'
 import { ODD_ONE_A, type RawOddOne } from './oddoneA'
 import { ODD_ONE_B } from './oddoneB'
+import { SYNC } from './sync'
 import { TRUE_FALSE, EMOJI, PICTURE, CLOSEST, ORDER, MOST_LIKELY, BLUFF } from './special'
 import {
   CATEGORIES,
@@ -64,6 +65,7 @@ export const ALL_QUESTIONS: Question[] = [
   ...MORE_BLUFF,
   ...ODD_ONE_A.map(oddOne),
   ...ODD_ONE_B.map(oddOne),
+  ...SYNC,
   ...TRUE_FALSE,
   ...EMOJI,
   ...PICTURE,
@@ -73,7 +75,15 @@ export const ALL_QUESTIONS: Question[] = [
   ...BLUFF,
 ]
 
-const BY_ID = new Map(ALL_QUESTIONS.map((q) => [q.id, q]))
+/** Fastest Finger replays Classic questions under its own rules. */
+const FASTEST: Question[] = ALL_QUESTIONS.flatMap((q) =>
+  q.type === 'choice' ? [{ ...q, id: `ff:${q.id}`, type: 'fastest' as const }] : [],
+)
+
+/** The question a Fastest Finger round was made from, so a game never asks it twice. */
+const baseId = (q: Question) => q.id.replace(/^ff:/, '')
+
+const BY_ID = new Map([...ALL_QUESTIONS, ...FASTEST].map((q) => [q.id, q]))
 
 export function getQuestionById(id: string): Question | undefined {
   return BY_ID.get(id)
@@ -89,7 +99,7 @@ export function countQuestions(category: Category, type?: QuestionType) {
 export function buildPool(settings: Pick<GameSettings, 'categories' | 'types'>): Question[] {
   const cats = new Set(settings.categories)
   const types = new Set(settings.types)
-  return ALL_QUESTIONS.filter((q) => {
+  return [...ALL_QUESTIONS, ...(types.has('fastest') ? FASTEST : [])].filter((q) => {
     if (!types.has(q.type)) return false
     if (GAME_TYPES[q.type].party) return true
     return cats.has(q.category)
@@ -149,6 +159,7 @@ export function pickQuestions(settings: GameSettings): Question[] {
   const partyCap = quizTypes.length === 0 ? count : Math.max(1, Math.floor(count / 6))
 
   const picked: Question[] = []
+  const used = new Set<string>()
   let partyPicked = 0
   // Weighted round robin: Classic takes two per lap, everything else one.
   const lap = [...quizTypes.flatMap((t) => (t === 'choice' ? [t, t] : [t])), ...partyTypes]
@@ -160,9 +171,11 @@ export function pickQuestions(settings: GameSettings): Question[] {
       const isParty = GAME_TYPES[t].party
       if (isParty && partyPicked >= partyCap) continue
       const list = buckets.get(t)
+      while (list?.length && used.has(baseId(list[list.length - 1]))) list.pop()
       const next = list?.[list.length - 1]
       if (!next) continue
       list!.pop()
+      used.add(baseId(next))
       picked.push(next)
       if (isParty) partyPicked++
       progressed = true
@@ -190,8 +203,8 @@ function pickRising(settings: GameSettings): Question[] {
     // Party rounds only in the middle stretch.
     const types = i === 1 || !quiz.length ? settings.types : quiz
     for (const q of pickQuestions({ ...settings, types, difficulty, questionCount: sizes[i] })) {
-      if (!seen.has(q.id)) {
-        seen.add(q.id)
+      if (!seen.has(baseId(q))) {
+        seen.add(baseId(q))
         picked.push(q)
       }
     }
@@ -199,8 +212,8 @@ function pickRising(settings: GameSettings): Question[] {
   if (picked.length < n) {
     for (const q of pickQuestions({ ...settings, difficulty: 'mixed', questionCount: n * 2 })) {
       if (picked.length >= n) break
-      if (!seen.has(q.id) && (party.includes(q.type) ? false : true)) {
-        seen.add(q.id)
+      if (!seen.has(baseId(q)) && (party.includes(q.type) ? false : true)) {
+        seen.add(baseId(q))
         picked.push(q)
       }
     }
@@ -243,8 +256,10 @@ function spreadTypes(picked: Question[], quizFirst = true): Question[] {
 
 export const GET_READY_MS = 3500
 
-export function answerWindowSeconds(type: QuestionType, timer: number, phase: 'answer' | 'write' = 'answer') {
+export function answerWindowSeconds(type: QuestionType, timer: number, phase: RoundData['phase'] = 'vote') {
   if (type === 'bluff' && phase === 'write') return Math.max(timer, 30) + 10
+  if (phase === 'wager') return 20
+  if (phase === 'pick') return timer + 5
   if (type === 'order') return timer + 10
   if (type === 'closest') return timer + 5
   return timer
@@ -261,11 +276,18 @@ export function toPublicQuestion(q: Question, roundData?: RoundData): PublicQues
     points: q.points,
     speedBonus: q.speedBonus,
   }
+  // Final Wager: bets go in before anyone sees the question.
+  if (roundData?.phase === 'wager') return { ...base, question: '' }
   switch (q.type) {
     case 'choice':
     case 'truefalse':
     case 'oddone':
+    case 'fastest':
       return { ...base, options: q.options }
+    case 'sync': {
+      const name = roundData?.sync?.name ?? 'someone'
+      return { ...base, question: q.question.replace('{name}', name), self: q.self, options: q.options }
+    }
     case 'emoji':
       return { ...base, options: q.options, emoji: q.emoji }
     case 'picture':

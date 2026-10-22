@@ -56,6 +56,13 @@ const LINES = {
   leaderWrong: ['Top of the table, bottom of this question.', 'Even the leader slips.', 'The crown wobbled a little.'],
   lastRight: ['The comeback starts here.', 'Climbing. Slowly, but climbing.', 'Do not call it a comeback yet.'],
   lostBigStreak: ['A great streak, gone in one tap.', 'That streak deserved a better ending.'],
+  fastestFirst: ['First in. Untouchable.', 'Nobody else stood a chance.', 'Fastest finger in the room.'],
+  fastestLate: ['Right, but someone beat you to it.', 'Correct. Just not first.', 'So close to the double.'],
+  syncRight: ['You read them perfectly.', 'In sync.', 'You know them too well.'],
+  syncWrong: ['Do you even know them?', 'Out of sync.', 'They surprised you.'],
+  syncNobody: ['Nobody saw that coming.', 'A complete mystery to everyone.'],
+  wagerWon: ['The bet paid off.', 'Bold, and right.'],
+  wagerLost: ['The bet did not land.', 'The house wins this time.'],
 } as const
 
 type LineKey = keyof typeof LINES
@@ -74,6 +81,14 @@ export function pickLine(key: LineKey, seed: string): string {
 
 export function quickTapLine(seed: string) {
   return pickLine('quickTap', seed)
+}
+
+/** Final Wager: what happened to your bet. */
+function betLine(r: PlayerResult, seed: string) {
+  if (!r.wager) return undefined
+  return r.correct
+    ? `${pickLine('wagerWon', seed)} +${r.wager.toLocaleString()} from your bet.`
+    : `${pickLine('wagerLost', seed)} -${r.wager.toLocaleString()} from your bet.`
 }
 
 export interface ResultLine {
@@ -98,9 +113,17 @@ export function resultLine(
     soleRank?: boolean
   },
 ): ResultLine {
+  // Sync: the player who went first sees how well the room read them.
+  if (r?.readBy !== undefined) {
+    return r.readBy
+      ? { headline: `${r.readBy} ${r.readBy === 1 ? 'person' : 'people'} read you right.`, tone: 'good' }
+      : { headline: pickLine('syncNobody', seed), tone: 'neutral' }
+  }
+
   if (!r || (!r.answered && !r.fooled)) {
     if (type === 'mostlikely' || type === 'wouldrather') return { headline: 'No vote.', tone: 'neutral' }
-    return { headline: pickLine('missed', seed), sub: r?.lostStreak ? pickLine('lostStreak', seed) : undefined, tone: 'bad' }
+    const bet = r ? betLine(r, seed) : undefined
+    return { headline: pickLine('missed', seed), sub: bet ?? (r?.lostStreak ? pickLine('lostStreak', seed) : undefined), tone: 'bad' }
   }
 
   const lost = r.lostStreak ? pickLine(r.lostStreak >= 5 ? 'lostBigStreak' : 'lostStreak', seed) : undefined
@@ -110,6 +133,11 @@ export function resultLine(
   const last = ranked && opts.rankBefore === opts.players
 
   switch (type) {
+    case 'sync':
+      return r.correct
+        ? { headline: pickLine('syncRight', seed), tone: 'good' }
+        : { headline: pickLine('syncWrong', seed), tone: 'neutral' }
+
     case 'mostlikely':
     case 'wouldrather':
       return r.points > 0
@@ -139,15 +167,18 @@ export function resultLine(
       }
 
     default: {
+      if (r.correct && type === 'fastest') {
+        return { headline: pickLine(r.first ? 'fastestFirst' : 'fastestLate', seed), sub: betLine(r, seed), tone: r.first ? 'good' : 'neutral' }
+      }
       if (r.correct) {
         const key: LineKey =
           crowd && opts.roomRight! <= 0.25 ? 'rareRight' : last ? 'lastRight' : r.tooFast ? 'fastRight' : 'right'
-        return { headline: pickLine(key, seed), sub: r.streak >= 3 ? pickLine('onStreak', seed) : undefined, tone: 'good' }
+        return { headline: pickLine(key, seed), sub: betLine(r, seed) ?? (r.streak >= 3 ? pickLine('onStreak', seed) : undefined), tone: 'good' }
       }
       const slow = r.timeMs != null && r.timeMs > opts.timerMs * 0.7
       const key: LineKey =
         crowd && opts.roomRight! >= 0.75 ? 'aloneWrong' : leader ? 'leaderWrong' : r.tooFast ? 'fastWrong' : slow ? 'slowWrong' : 'wrong'
-      return { headline: pickLine(key, seed), sub: lost, tone: 'bad' }
+      return { headline: pickLine(key, seed), sub: betLine(r, seed) ?? lost, tone: 'bad' }
     }
   }
 }

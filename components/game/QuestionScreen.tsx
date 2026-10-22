@@ -5,9 +5,10 @@ import { CATEGORIES, GAME_TYPES } from '@/lib/game/questions/schema'
 import { TimerBar } from '@/components/ui/Countdown'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { GetReady } from '@/components/game/GetReady'
-import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PlayerVote, PromptExtras } from '@/components/game/answers'
+import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PlayerVote, PromptExtras, SyncWait, WagerInput } from '@/components/game/answers'
 import { serverNow, useServerNow } from '@/lib/clock'
 import { quickTapLine } from '@/lib/game/lines'
+import { maxWager } from '@/lib/game/scoring'
 import { sound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 import type { GameStateResponse } from '@/types'
@@ -45,7 +46,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     pressedAt.current = serverNow()
   }
 
-  const phase = round?.data?.phase === 'write' ? 'write' : 'answer'
+  const phase = round?.data?.phase ?? 'vote'
   const phaseKey = `${round?.id}:${phase}`
 
   useEffect(() => {
@@ -59,7 +60,17 @@ export function QuestionScreen({ state, onSubmit }: Props) {
 
   const startsAt = Date.parse(round.starts_at)
   const endsAt = Date.parse(round.ends_at)
-  const isVote = q.type === 'bluff' && phase === 'answer'
+  const isVote = q.type === 'bluff' && phase === 'vote'
+  const spot = round.data?.sync
+  const amSpot = Boolean(spot && spot.id === myPlayer?.id)
+  const wagerRound = Boolean(round.data?.wager)
+  const readyLabel =
+    phase === 'wager' ? 'Final Wager'
+    : wagerRound ? 'Final question'
+    : isVote ? 'Voting time'
+    : phase === 'pick' ? (amSpot ? 'You go first' : `${spot?.name ?? 'Someone'} goes first`)
+    : q.type === 'sync' ? 'Your turn to guess'
+    : undefined
 
   if (now < startsAt) {
     return (
@@ -69,7 +80,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
           number={round.round_number}
           total={game.total_questions}
           startsAt={round.starts_at}
-          label={isVote ? 'Voting time' : undefined}
+          label={readyLabel}
         />
       </main>
     )
@@ -77,7 +88,12 @@ export function QuestionScreen({ state, onSubmit }: Props) {
 
   const timeUp = now > endsAt
   const serverAnswer = state.myAnswer
-  const done = phase === 'write' ? Boolean(state.myBluff) : Boolean(serverAnswer) || pending !== null
+  const done =
+    phase === 'write' ? Boolean(state.myBluff)
+    : phase === 'wager' ? state.myWager !== null || pending !== null
+    : phase === 'pick' ? !amSpot || state.myPick !== null || pending !== null
+    : q.type === 'sync' && amSpot ? true
+    : Boolean(serverAnswer) || pending !== null
   const armedAt = startsAt + ARM_DELAY_MS
   const armed = now >= armedAt
   const locked = done || timeUp || busy
@@ -105,7 +121,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     if (res.tooFast) setNote(quickTapLine(`${myPlayer?.id}:${q?.id}`))
   }
 
-  const selectedIndex = pending?.optionIndex ?? serverAnswer?.option_index ?? null
+  const selectedIndex = pending?.optionIndex ?? (phase === 'pick' ? state.myPick : serverAnswer?.option_index) ?? null
 
   // The bluffer's own fake is shown but cannot be picked.
   const ownIndex =
@@ -114,7 +130,22 @@ export function QuestionScreen({ state, onSubmit }: Props) {
       : null
 
   let body: React.ReactNode
-  if (q.type === 'bluff' && phase === 'write') {
+  if (phase === 'wager') {
+    const score = state.myScore
+    body = (
+      <WagerInput
+        score={score}
+        max={maxWager(score)}
+        disabled={locked}
+        submitted={pending?.value ?? state.myWager}
+        onSubmit={(value) => submit({ value })}
+      />
+    )
+  } else if (q.type === 'sync' && phase === 'pick' && !amSpot) {
+    body = <SyncWait avatar={spot?.avatar} title={`${spot?.name ?? 'Someone'} is answering`} text="Get ready. Your turn is next." />
+  } else if (q.type === 'sync' && phase === 'vote' && amSpot) {
+    body = <SyncWait avatar={spot?.avatar} title="Your answer is in" text="Now everyone is guessing what you picked." />
+  } else if (q.type === 'bluff' && phase === 'write') {
     body = <BluffWrite disabled={timeUp || busy} submitted={state.myBluff} onSubmit={(text) => submit({ text })} />
   } else if (q.type === 'mostlikely') {
     body = (
@@ -161,7 +192,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     : note
       ? note
       : done
-        ? phase === 'write' ? 'Fake submitted.' : 'Locked in.'
+        ? phase === 'write' ? 'Fake submitted.' : phase === 'wager' ? 'Bet placed.' : q.type === 'sync' && (amSpot || phase === 'pick') ? null : 'Locked in.'
         : timeUp
           ? 'Time is up.'
           : null
@@ -173,7 +204,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-lg">{q.category === 'party' ? '🎉' : cat.emoji}</span>
             <span className="text-xs text-stone-400 tracking-widest uppercase truncate">
-              {round.round_number} / {game.total_questions} · {isVote ? 'Find the real answer' : type.short}
+              {round.round_number} / {game.total_questions} · {phase === 'wager' ? 'Final Wager' : isVote ? 'Find the real answer' : type.short}
             </span>
           </div>
           <SoundToggle />
@@ -182,7 +213,13 @@ export function QuestionScreen({ state, onSubmit }: Props) {
         <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} ticking={!done} />
 
         <div className="animate-fade-up space-y-3">
-          <h2 className="text-xl font-medium text-stone-900 leading-snug">{q.question}</h2>
+          <h2 className="text-xl font-medium text-stone-900 leading-snug">
+            {phase === 'wager'
+              ? `Last question: ${q.category === 'party' ? type.label : cat.label}. How much will you bet?`
+              : phase === 'pick' && amSpot
+                ? q.self
+                : q.question}
+          </h2>
           <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} />
         </div>
 
@@ -196,9 +233,12 @@ export function QuestionScreen({ state, onSubmit }: Props) {
               {status}
             </p>
           )}
-          <p className="text-xs text-stone-400">
-            {state.answeredCount} of {totalPlayers} {phase === 'write' ? 'written' : 'answered'}
-          </p>
+          {phase !== 'pick' && (
+            <p className="text-xs text-stone-400">
+              {state.answeredCount} of {q.type === 'sync' ? Math.max(1, totalPlayers - 1) : totalPlayers}{' '}
+              {phase === 'write' ? 'written' : phase === 'wager' ? 'bets in' : 'answered'}
+            </p>
+          )}
         </footer>
       </div>
     </main>

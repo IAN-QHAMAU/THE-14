@@ -5,7 +5,7 @@ export type { AnswerPayload, AnswerStat, Award, PlayerStats, PlayerTag, RevealPa
 
 export type GameStatus = 'waiting' | 'category' | 'active' | 'question_result' | 'leaderboard' | 'finished'
 export type RoundStatus = 'pending' | 'active' | 'voting' | 'locked' | 'revealing' | 'complete'
-export type ActionType = 'answer' | 'bluff'
+export type ActionType = 'answer' | 'bluff' | 'wager' | 'pick'
 
 export interface Game {
   id: string
@@ -92,6 +92,10 @@ export interface GameStateResponse {
   currentQuestion: PublicQuestion | null
   myAnswer: AnswerPayload | null
   myBluff: string | null
+  /** Final Wager: your bet, once placed. */
+  myWager: number | null
+  /** Sync: your own answer, when you are on the spot. */
+  myPick: number | null
   submissionStatus: Record<string, boolean>
   answeredCount: number
   reveal: RevealPayload | null

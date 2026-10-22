@@ -17,6 +17,13 @@ export const TOO_FAST_MS = 1200
 export const STREAK_BONUS = 50
 /** Points a bluffer earns for each player who picks their fake. */
 export const FOOL_POINTS = 75
+/** Points the Sync player earns for each friend who reads them right. */
+export const READ_POINTS = 50
+
+/** Final Wager: bet up to half your points, and at least 200 so everyone can play. */
+export function maxWager(score: number) {
+  return Math.max(200, Math.floor(score / 2))
+}
 
 export interface AnswerPayload {
   option_index?: number
@@ -53,6 +60,12 @@ export interface PlayerResult {
   /** Bluff: how many players picked your fake, and whose fake you picked. */
   fooled?: number
   fellFor?: string[]
+  /** Final Wager: your bet, won if correct is true. */
+  wager?: number
+  /** Fastest Finger: you were the first right answer. */
+  first?: boolean
+  /** Sync: how many friends guessed your answer. */
+  readBy?: number
 }
 
 export interface AnswerStat {
@@ -75,6 +88,12 @@ export interface RevealPayload {
   option_authors?: string[][]
   /** Odd One Out: why the answer is the odd one. */
   explain?: string
+  /** Fastest Finger: who got the right answer first. */
+  first_player_id?: string
+  /** Sync: who went first, and how many guessed them right. */
+  sync_id?: string
+  /** Final Wager: this was the bet round. */
+  wager?: boolean
   results: Record<string, PlayerResult>
   rank_before: Record<string, number>
   rank_after: Record<string, number>
@@ -191,6 +210,53 @@ export function gradeRound(input: {
         graded.set(a.player_id, { correct: true, points: q.points + speedBonusFor(rank, q.speedBonus) })
       })
       for (const a of answers) if (!graded.has(a.player_id)) graded.set(a.player_id, { correct: false, points: 0 })
+      break
+    }
+
+    case 'fastest': {
+      // Only the first right answer scores, worth double. Other right answers
+      // still keep their streak.
+      reveal.options = q.options
+      reveal.correct_index = q.correct
+      reveal.correct_indices = [q.correct]
+      const counts = q.options.map(() => 0)
+      for (const a of answers) {
+        const i = a.payload.option_index ?? -1
+        if (i >= 0 && i < counts.length) counts[i]++
+      }
+      reveal.answer_stats = stats(counts, answers.length)
+      const right = answers.filter((a) => a.payload.option_index === q.correct).sort(byTime)
+      reveal.first_player_id = right[0]?.player_id
+      right.forEach((a, rank) => {
+        graded.set(a.player_id, { correct: true, points: rank === 0 ? q.points * 2 : 0, extra: { first: rank === 0 } })
+      })
+      for (const a of answers) if (!graded.has(a.player_id)) graded.set(a.player_id, { correct: false, points: 0 })
+      break
+    }
+
+    case 'sync': {
+      const spotId = data.sync?.id
+      const pick = input.answers.find((a) => a.action_type === 'pick' && a.player_id === spotId)
+      const picked = pick?.payload.option_index ?? -1
+      reveal.options = q.options
+      reveal.sync_id = spotId
+      const guesses = answers.filter((a) => a.player_id !== spotId)
+      const counts = q.options.map(() => 0)
+      for (const a of guesses) {
+        const i = a.payload.option_index ?? -1
+        if (i >= 0 && i < counts.length) counts[i]++
+      }
+      reveal.answer_stats = stats(counts, guesses.length)
+      if (picked < 0 || !spotId) break
+      reveal.correct_index = picked
+      reveal.correct_indices = [picked]
+      let readBy = 0
+      for (const a of guesses) {
+        const right = a.payload.option_index === picked
+        if (right) readBy++
+        graded.set(a.player_id, { correct: right, points: right ? q.points : 0 })
+      }
+      graded.set(spotId, { correct: null, points: readBy * READ_POINTS, extra: { readBy } })
       break
     }
 
@@ -334,6 +400,18 @@ export function gradeRound(input: {
       streakBonus,
       lostStreak,
       ...g?.extra,
+    }
+  }
+
+  // Final Wager: win your bet if you got it right, lose it if not.
+  if (data.wager) {
+    reveal.wager = true
+    for (const w of input.answers.filter((a) => a.action_type === 'wager')) {
+      const r = results[w.player_id]
+      const bet = w.payload.value ?? 0
+      if (!r || !bet) continue
+      r.wager = bet
+      r.points += r.correct ? bet : -bet
     }
   }
 
