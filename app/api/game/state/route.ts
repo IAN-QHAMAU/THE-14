@@ -109,7 +109,9 @@ export async function GET() {
     myAnswer: mine.answer,
     myBluff: mine.bluff?.text ?? null,
     myWager: mine.wager?.value ?? null,
-    myPick: mine.pick?.option_index ?? null,
+    // A written answer counts as picked too (-1: not one of the options).
+    myPick: mine.pick?.option_index ?? (mine.pick?.text ? -1 : null),
+    myPickText: mine.pick?.text ?? null,
     submissionStatus,
     answeredCount,
     reveal,

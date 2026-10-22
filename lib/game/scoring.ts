@@ -86,8 +86,9 @@ export interface RevealPayload {
   correct_order?: string[]
   fully_correct?: number
   option_authors?: string[][]
-  /** Odd One Out: why the answer is the odd one. */
+  /** Odd One Out: why the answer is the odd one, and what each picture is. */
   explain?: string
+  option_labels?: string[]
   /** Fastest Finger: who got the right answer first. */
   first_player_id?: string
   /** Sync: who went first, and how many guessed them right. */
@@ -109,6 +110,21 @@ export interface GradePlayer {
 
 export function normalizeText(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?]+$/, '')
+}
+
+/**
+ * One house style for every answer shown side by side, so nobody can spot
+ * the real one (or a friend's) by how it is typed: single spaces, no full
+ * stop at the end, SHOUTING calmed down, and a capital first letter.
+ */
+export function tidyAnswer(s: string) {
+  let t = s.trim().replace(/\s+/g, ' ').replace(/[.!,;:]+$/, '')
+  const letters = t.replace(/[^A-Za-z]/g, '')
+  // Short all caps words are usually acronyms (NASA, KFC), so they stay.
+  if (letters.length > 4 && letters === letters.toUpperCase()) t = t.toLowerCase()
+  // Leave names like iPhone and eBay alone.
+  if (/^[a-z][A-Z]/.test(t)) return t
+  return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
 export function computeRanks(scores: Record<string, number>): Record<string, number> {
@@ -139,6 +155,23 @@ function byTime(a: AnswerRow, b: AnswerRow) {
   return (a.payload.time_taken_ms ?? 1e9) - (b.payload.time_taken_ms ?? 1e9)
 }
 
+/**
+ * Sync: the options everyone guesses from. A written answer takes the place
+ * of one ready made option, and every option gets the same house style, so
+ * the written one does not stand out.
+ */
+export function buildSyncOptions(presets: string[], pick: AnswerPayload | undefined, seed: string): string[] {
+  const random = seededRandom(seed)
+  const own = pick?.text ? tidyAnswer(pick.text) : null
+  const matches = own ? presets.findIndex((p) => normalizeText(p) === normalizeText(own)) : -1
+  let options = presets.map(tidyAnswer)
+  if (own && matches < 0) {
+    const drop = Math.floor(random() * options.length)
+    options = [...options.filter((_, i) => i !== drop), own]
+  }
+  return shuffle(options, random)
+}
+
 /** Build the shuffled options for the vote phase of a bluff round. */
 export function buildBluffOptions(question: BluffQuestion, writes: AnswerRow[], seed: string): string[] {
   const real = normalizeText(question.answer)
@@ -149,16 +182,16 @@ export function buildBluffOptions(question: BluffQuestion, writes: AnswerRow[], 
     const key = normalizeText(text)
     if (!key || seen.has(key)) continue
     seen.add(key)
-    fakes.push(text)
+    fakes.push(tidyAnswer(text))
   }
   for (const d of question.decoys) {
     if (fakes.length >= 2) break
     const key = normalizeText(d)
     if (seen.has(key)) continue
     seen.add(key)
-    fakes.push(d)
+    fakes.push(tidyAnswer(d))
   }
-  return shuffle([...fakes, question.answer], seededRandom(seed))
+  return shuffle([...fakes, tidyAnswer(question.answer)], seededRandom(seed))
 }
 
 // ─── Grading ───────────────────────────────────────────────────────────────
@@ -195,7 +228,10 @@ export function gradeRound(input: {
     case 'emoji':
     case 'picture':
     case 'oddone': {
-      if (q.type === 'oddone') reveal.explain = q.why
+      if (q.type === 'oddone') {
+        reveal.explain = q.why
+        reveal.option_labels = q.names
+      }
       reveal.options = q.options
       reveal.correct_index = q.correct
       reveal.correct_indices = [q.correct]
@@ -237,11 +273,14 @@ export function gradeRound(input: {
     case 'sync': {
       const spotId = data.sync?.id
       const pick = input.answers.find((a) => a.action_type === 'pick' && a.player_id === spotId)
-      const picked = pick?.payload.option_index ?? -1
-      reveal.options = q.options
+      const options = data.options ?? q.options
+      // The answer as text, whether it was picked from the list or written.
+      const pickedText = pick?.payload.text ?? (pick?.payload.option_index != null ? q.options[pick.payload.option_index] : null)
+      const picked = pickedText ? options.findIndex((o) => normalizeText(o) === normalizeText(pickedText)) : -1
+      reveal.options = options
       reveal.sync_id = spotId
       const guesses = answers.filter((a) => a.player_id !== spotId)
-      const counts = q.options.map(() => 0)
+      const counts = options.map(() => 0)
       for (const a of guesses) {
         const i = a.payload.option_index ?? -1
         if (i >= 0 && i < counts.length) counts[i]++

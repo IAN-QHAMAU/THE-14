@@ -149,7 +149,14 @@ export function RevealBoard({ reveal, question, players, myPlayerId, myChoice, s
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className={cn('min-w-0 flex items-center gap-2', isRight ? cn(strong, 'font-medium') : muted)}>
                   {!isMostLikely && <span className="text-xs font-mono opacity-60">{LETTERS[idx]}</span>}
-                  <span className="truncate">{opt}</span>
+                  {reveal.option_labels ? (
+                    <span className="truncate">
+                      <span className={cn('mr-2 align-middle', stage ? 'text-3xl' : 'text-2xl')}>{opt}</span>
+                      {reveal.option_labels[idx]}
+                    </span>
+                  ) : (
+                    <span className="truncate">{opt}</span>
+                  )}
                   {isRight && !isMostLikely && <span className="text-emerald-600 text-xs">✓</span>}
                   {mine && <span className={cn('text-[10px] uppercase tracking-wider rounded-full px-1.5 py-0.5', dark ? 'bg-stone-700 text-stone-300' : 'bg-stone-200 text-stone-600')}>You</span>}
                 </span>

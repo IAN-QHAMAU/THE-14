@@ -81,32 +81,34 @@ Open [http://localhost:3000](http://localhost:3000)
 | Picture Round | A flag starts blurred and zoomed in, then sharpens. Earlier is harder. |
 | Closest Wins | Guess a number with a slider. Closest gets the most points. |
 | Put in Order | Tap four items in the right order |
-| Odd One Out | Four things, one does not belong. The reveal says why. |
+| Odd One Out | Four pictures, one does not belong. Works with any category. The reveal names each picture and says why. |
 | Fastest Finger | Classic questions where only the first right answer scores, and it scores double. |
 | Most Likely To | Party mode. Vote for a player. Side with the room to score. |
 | Bluff | Party mode. Everyone writes a fake answer, then tries to find the real one. Points for every player your fake fools. |
 | Would You Rather | Party mode. Pick one of two options. Side with the room to score. Worth half points, since it is a matter of taste. |
 | Sync | Party mode. How in sync is the room? Try it and see. |
 
+Typed answers (Bluff fakes, Sync answers) are shown in one house style: a capital first letter, no full stop at the end and shouting calmed down, so nobody can spot an answer by how it was typed.
+
 Party rounds are capped at about one in six questions and never open the game.
 
-**Final Wager:** a switch in setup. The last question becomes a bet: everyone stakes up to half their points (at least 200) before seeing it, then wins or loses the bet. Scores never drop below zero.
+**Final Wager:** a switch in setup. The last question becomes a bet: everyone stakes up to half their points (at least 200) before seeing it, then wins or loses the bet. Bets can be changed until the betting time runs out. Scores never drop below zero.
 
 ---
 
 ## Categories
 
-1900 questions across 44 categories, each marked easy, medium or hard.
+1812 questions across 44 categories, each marked easy, medium or hard.
 
 | Group | Categories (questions) |
 |---|---|
-| **Brain** | 🧠 General Knowledge (45), 🔬 Science (48), 🏛️ History (46), 🗺️ Flags & Places (59), 🪐 Space (43), 🧩 Riddles & Numbers (34), ⚡ Wild Facts (26), 💻 Tech (47), 🔤 Words & Language (35), ⚱️ Mythology (36), 🫀 Human Body (41), 🏆 World Records (31), 💡 Inventions (34), 🦖 Dinosaurs (36) |
-| **Pop Culture** | ⛩️ Anime (97), 🎬 Movies & TV (58), 🎵 Music (43), 🎮 Gaming (36), 📱 Internet Culture (31), 🦸 Superheroes (32), 📺 Cartoons (31), 📚 Books & Literature (37), 🥁 African Music (33), 🎤 Hip-Hop & R&B (32), 🍿 TV Series (35), 🏰 Disney & Pixar (33), 📼 2000s Throwback (33), 🔍 Mysteries & Detectives (32) |
-| **Sports** | 🏅 Sports Mix (32), ⚽ Football (44), 🏀 Basketball (31), 🏎️ Motorsport (30), 🏃 Athletics & Olympics (34), 🎾 Tennis, Rugby & Cricket (30), 🤼 Wrestling (33) |
-| **Kenya & Africa** | 🇰🇪 Kenya (43), 🌍 Africa (50) |
-| **Lifestyle** | 🍕 Food & Drinks (36), 🚗 Cars (34), 🐘 Animals (35), 🏷️ Brands & Logos (33), 💰 Money & Business (35), 👗 Fashion (34), 🌊 Ocean & Nature (31) |
+| **Brain** | 🧠 General Knowledge (39), 🔬 Science (42), 🏛️ History (40), 🗺️ Flags & Places (53), 🪐 Space (37), 🧩 Riddles & Numbers (28), ⚡ Wild Facts (20), 💻 Tech (41), 🔤 Words & Language (29), ⚱️ Mythology (30), 🫀 Human Body (35), 🏆 World Records (25), 💡 Inventions (28), 🦖 Dinosaurs (30) |
+| **Pop Culture** | ⛩️ Anime (93), 🎬 Movies & TV (54), 🎵 Music (39), 🎮 Gaming (32), 📱 Internet Culture (27), 🦸 Superheroes (29), 📺 Cartoons (27), 📚 Books & Literature (33), 🥁 African Music (29), 🎤 Hip-Hop & R&B (28), 🍿 TV Series (31), 🏰 Disney & Pixar (29), 📼 2000s Throwback (29), 🔍 Mysteries & Detectives (28) |
+| **Sports** | 🏅 Sports Mix (28), ⚽ Football (40), 🏀 Basketball (27), 🏎️ Motorsport (26), 🏃 Athletics & Olympics (30), 🎾 Tennis, Rugby & Cricket (26), 🤼 Wrestling (29) |
+| **Kenya & Africa** | 🇰🇪 Kenya (37), 🌍 Africa (44) |
+| **Lifestyle** | 🍕 Food & Drinks (33), 🚗 Cars (30), 🐘 Animals (33), 🏷️ Brands & Logos (29), 💰 Money & Business (31), 👗 Fashion (30), 🌊 Ocean & Nature (27) |
 
-Plus 90 Most Likely To prompts, 51 Bluff prompts and 70 Would You Rather prompts that work with any category.
+Plus 90 Most Likely To prompts, 51 Bluff prompts and 70 Would You Rather prompts that work with any category. Odd One Out has 80 picture puzzles and Sync has 36 prompts.
 
 ### Difficulty
 

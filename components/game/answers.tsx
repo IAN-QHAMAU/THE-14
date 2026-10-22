@@ -5,6 +5,7 @@ import { AvatarDisplay } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useServerNow } from '@/lib/clock'
 import { cn } from '@/lib/utils'
+import { tidyAnswer } from '@/lib/game/scoring'
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P']
 
@@ -303,14 +304,105 @@ export function WagerInput({
           </button>
         ))}
       </div>
-      <Button size="lg" disabled={disabled} onClick={() => onSubmit(value)}>
-        {submitted !== null ? 'Bet placed' : 'Place bet'}
+      <Button size="lg" disabled={disabled || value === submitted} onClick={() => onSubmit(value)}>
+        {submitted === null ? 'Place bet' : value === submitted ? 'Bet placed' : 'Change bet'}
       </Button>
     </div>
   )
 }
 
 // ─── Sync ─────────────────────────────────────────────────────────────
+
+/** Odd One Out: four big pictures in a grid. */
+export function PicturePad({
+  pics,
+  selected,
+  disabled,
+  onPick,
+}: {
+  pics: string[]
+  selected: number | null
+  disabled: boolean
+  onPick: (i: number) => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {pics.map((pic, idx) => {
+        const isSelected = selected === idx
+        const faded = selected !== null && !isSelected
+        return (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => onPick(idx)}
+            disabled={disabled}
+            aria-label={`Picture ${idx + 1}`}
+            className={cn(
+              'aspect-square rounded-3xl border flex items-center justify-center transition-all duration-150 active:scale-95 disabled:cursor-default',
+              isSelected ? 'border-stone-900 bg-stone-900 shadow-lg scale-[1.02]' : faded ? 'border-stone-100 bg-stone-50 opacity-40' : 'border-stone-200 bg-white hover:border-stone-400',
+            )}
+          >
+            <span className="text-7xl leading-none select-none">{pic}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Sync: pick one of the answers, or write your own. */
+export function SyncPick({
+  options,
+  selected,
+  written,
+  disabled,
+  onPick,
+  onWrite,
+}: {
+  options: string[]
+  selected: number | null
+  written: string | null
+  disabled: boolean
+  onPick: (i: number) => void
+  onWrite: (text: string) => void
+}) {
+  const [text, setText] = useState('')
+  if (written) {
+    return (
+      <div className="rounded-xl border border-stone-200 bg-white p-4 text-center space-y-1">
+        <p className="text-xs uppercase tracking-widest text-stone-400">Your answer</p>
+        <p className="text-lg text-stone-800">{tidyAnswer(written)}</p>
+        <p className="text-xs text-stone-400 pt-2">It will look just like the others.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-4">
+      <OptionPad options={options} selected={selected} disabled={disabled} onPick={onPick} />
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (text.trim()) onWrite(text.trim())
+        }}
+      >
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={40}
+          disabled={disabled}
+          placeholder="Or write your own"
+          className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-stone-200 bg-white text-base focus:outline-none focus:border-stone-900"
+          aria-label="Write your own answer"
+          autoComplete="off"
+        />
+        <Button type="submit" disabled={disabled || !text.trim()} className="w-auto px-5">
+          Send
+        </Button>
+      </form>
+    </div>
+  )
+}
 
 /** Shown while it is someone else's turn to answer. */
 export function SyncWait({ avatar, title, text }: { avatar?: string; title: string; text: string }) {
@@ -404,7 +496,7 @@ export function BluffWrite({
     return (
       <div className="rounded-xl border border-stone-200 bg-white p-4 text-center space-y-1">
         <p className="text-xs uppercase tracking-widest text-stone-400">Your fake</p>
-        <p className="text-lg text-stone-800">{submitted}</p>
+        <p className="text-lg text-stone-800">{tidyAnswer(submitted)}</p>
         <p className="text-xs text-stone-400 pt-2">Voting opens when everyone is done.</p>
       </div>
     )

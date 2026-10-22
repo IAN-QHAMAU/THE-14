@@ -210,6 +210,14 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         <p className="text-lg text-stone-400">{spot?.name ?? 'They'} is answering on their phone. Everyone else guesses next.</p>
       ) : isWrite ? (
         <p className="text-lg text-stone-400">Players are writing their fakes on their phones.</p>
+      ) : q.type === 'oddone' ? (
+        <div className="grid grid-cols-4 gap-4 max-w-3xl">
+          {(q.options ?? []).map((pic, i) => (
+            <div key={i} className="aspect-square rounded-3xl bg-stone-800 flex items-center justify-center">
+              <span className={cn('leading-none', size === 'stage' ? 'text-8xl' : 'text-5xl')}>{pic}</span>
+            </div>
+          ))}
+        </div>
       ) : q.type === 'closest' ? (
         <p className="text-lg text-stone-400">
           Guess between {q.min?.toLocaleString()} and {q.max?.toLocaleString()}
