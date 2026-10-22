@@ -61,7 +61,7 @@ export function QuestionResult({ state, onReact }: Props) {
             line.tone === 'good' ? 'bg-emerald-50 text-emerald-950' : line.tone === 'bad' ? 'bg-rose-50 text-rose-950' : 'bg-stone-100 text-stone-800',
           )}
         >
-          {myPlayer && <AvatarDisplay avatarId={myPlayer.avatar} size="lg" mood={line.tone === 'good' ? 'happy' : line.tone === 'bad' ? 'sad' : null} />}
+          {myPlayer && <AvatarDisplay avatarId={myPlayer.avatar} size="lg" tilt mood={line.tone === 'good' ? 'happy' : line.tone === 'bad' ? 'sad' : null} />}
           <div className="min-w-0 flex-1">
             <p className="text-lg font-medium leading-snug">{line.headline}</p>
             {line.sub && <p className="text-sm opacity-70 mt-0.5">{line.sub}</p>}

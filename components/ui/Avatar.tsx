@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   AVATAR_BACKGROUNDS,
@@ -67,12 +67,6 @@ const STYLES: Record<AvatarStyle, StyleDef> = {
     happy: { mouth: ['smile', 'twinkle'], eyes: ['happy'], eyebrows: ['raisedExcitedNatural'] },
     sad: { mouth: ['sad', 'concerned'], eyes: ['cry'], eyebrows: ['sadConcernedNatural'] },
   },
-  personas: {
-    load: () => import('@dicebear/personas'),
-    base: { mouth: ['smile', 'bigSmile', 'smirk', 'lips'], eyes: ['open', 'happy', 'wink'] },
-    happy: { mouth: ['bigSmile'], eyes: ['happy'] },
-    sad: { mouth: ['frown'] },
-  },
 }
 
 type Renderer = (seed: string, bg: string, mood: AvatarMood) => string
@@ -135,11 +129,61 @@ const SIZES = {
   xl: 'w-24 h-24 text-5xl',
 }
 
+/**
+ * Turns the avatar toward the finger (or mouse) and the tilt of the phone,
+ * easing back to centre, so it feels like it sits in 3D space.
+ */
+function useTilt(enabled: boolean) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!enabled || !el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let target = { x: 0, y: 0 }
+    const cur = { x: 0, y: 0 }
+    let frame = 0
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    const tick = () => {
+      cur.x += (target.x - cur.x) * 0.12
+      cur.y += (target.y - cur.y) * 0.12
+      el.style.transform = `perspective(400px) rotateY(${cur.x * 22}deg) rotateX(${-cur.y * 18}deg)`
+      if (Math.abs(target.x - cur.x) > 0.001 || Math.abs(target.y - cur.y) > 0.001) frame = requestAnimationFrame(tick)
+      else frame = 0
+    }
+    const aim = (x: number, y: number) => {
+      target = { x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)) }
+      if (!frame) frame = requestAnimationFrame(tick)
+      if (idleTimer) clearTimeout(idleTimer)
+      // Drift back to centre when nothing moves for a while.
+      idleTimer = setTimeout(() => aim(0, 0), 2500)
+    }
+    const onPointer = (e: PointerEvent) => {
+      const r = el.getBoundingClientRect()
+      aim((e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2), (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2))
+    }
+    const onTilt = (e: DeviceOrientationEvent) => {
+      if (e.gamma == null || e.beta == null) return
+      aim(e.gamma / 30, (e.beta - 45) / 30)
+    }
+    window.addEventListener('pointermove', onPointer, { passive: true })
+    window.addEventListener('pointerdown', onPointer, { passive: true })
+    window.addEventListener('deviceorientation', onTilt)
+    return () => {
+      window.removeEventListener('pointermove', onPointer)
+      window.removeEventListener('pointerdown', onPointer)
+      window.removeEventListener('deviceorientation', onTilt)
+      if (frame) cancelAnimationFrame(frame)
+      if (idleTimer) clearTimeout(idleTimer)
+    }
+  }, [enabled])
+  return ref
+}
+
 export function AvatarDisplay({
   avatarId,
   size = 'md',
   mood = null,
   idle = false,
+  tilt = false,
   className,
   style,
 }: {
@@ -148,6 +192,8 @@ export function AvatarDisplay({
   mood?: AvatarMood
   /** A slow, gentle sway, for avatars waiting around in the lobby. */
   idle?: boolean
+  /** Leans toward your finger and the tilt of your phone. For your own big avatar. */
+  tilt?: boolean
   className?: string
   style?: React.CSSProperties
 }) {
@@ -155,6 +201,8 @@ export function AvatarDisplay({
   const base = useAvatarUri(parsed?.style, parsed?.seed, parsed?.bg)
   const faced = useAvatarUri(parsed?.style, parsed?.seed, parsed?.bg, mood)
   const uri = faced ?? base
+  // Start once the artwork is on screen, so there is something to turn.
+  const tiltRef = useTilt(tilt && Boolean(uri))
   const moodClass = mood === 'happy' ? 'motion-safe:animate-avatar-hop' : mood === 'sad' ? 'motion-safe:animate-avatar-droop grayscale-[40%]' : idle ? 'motion-safe:animate-avatar-idle' : ''
 
   if (parsed && !uri) {
@@ -168,9 +216,13 @@ export function AvatarDisplay({
       </span>
     )
   }
+  // eslint-disable-next-line @next/next/no-img-element
+  const img = <img src={uri} alt="" draggable={false} className={cn('rounded-full flex-shrink-0 select-none', SIZES[size], moodClass, className)} style={style} />
+  if (!tilt) return img
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={uri} alt="" draggable={false} className={cn('rounded-full flex-shrink-0 select-none', SIZES[size], moodClass, className)} style={style} />
+    <span ref={tiltRef} className="inline-block flex-shrink-0 [transform-style:preserve-3d] will-change-transform">
+      {img}
+    </span>
   )
 }
 
@@ -209,7 +261,7 @@ export function AvatarPicker({ selected, onSelect }: { selected: string; onSelec
       <p className="text-xs font-medium tracking-widest uppercase text-stone-500">Your avatar</p>
 
       <div className="flex items-center gap-4">
-        <AvatarDisplay avatarId={selected} size="xl" />
+        <AvatarDisplay avatarId={selected} size="xl" tilt />
         <div className="flex-1 space-y-3">
           <div className="flex flex-wrap gap-1.5">
             {AVATAR_STYLES.map((s) => (

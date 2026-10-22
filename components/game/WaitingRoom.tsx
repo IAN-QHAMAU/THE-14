@@ -32,7 +32,7 @@ export function WaitingRoom({ game, players, myPlayer }: Props) {
 
         {myPlayer && (
           <section className="flex items-center gap-4 rounded-2xl bg-white border border-stone-200 p-4 animate-fade-up">
-            <AvatarDisplay avatarId={myPlayer.avatar} size="lg" mood="happy" />
+            <AvatarDisplay avatarId={myPlayer.avatar} size="lg" mood="happy" tilt />
             <div>
               <p className="text-lg text-stone-900">{myPlayer.name}</p>
               <p className="text-sm text-stone-400">You are in. The host will start soon.</p>
