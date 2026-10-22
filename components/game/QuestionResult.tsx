@@ -22,7 +22,20 @@ export function QuestionResult({ state, onReact }: Props) {
 
   const timerMs = (game.settings?.timer ?? 20) * 1000
   const names = (ids?: string[]) => (ids ?? []).map((id) => state.players.find((p) => p.id === id)?.name ?? 'someone')
-  const line = reveal && q ? resultLine(reveal.type, r, `${me}:${q.id}`, { timerMs, fellForNames: names(r?.fellFor) }) : null
+  const answered = reveal ? Object.values(reveal.results).filter((x) => x.answered) : []
+  const line =
+    reveal && q
+      ? resultLine(reveal.type, r, `${me}:${q.id}`, {
+          timerMs,
+          fellForNames: names(r?.fellFor),
+          answered: answered.length,
+          roomRight: answered.length ? answered.filter((x) => x.correct).length / answered.length : undefined,
+          rankBefore: reveal.rank_before[me],
+          players: Object.keys(reveal.rank_before).length,
+          // Ties (like everyone on 0 at the start) make no one the leader.
+          soleRank: Object.values(reveal.rank_before).filter((x) => x === reveal.rank_before[me]).length === 1,
+        })
+      : null
 
   useEffect(() => {
     if (!line || !round || played.current === round.id) return
