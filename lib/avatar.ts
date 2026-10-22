@@ -9,7 +9,6 @@ export const AVATAR_STYLES = [
   { id: 'openPeeps', label: 'Peeps' },
   { id: 'toonHead', label: 'Toon' },
   { id: 'avataaars', label: 'Classic' },
-  { id: 'personas', label: 'Persona' },
 ] as const
 
 export type AvatarStyle = (typeof AVATAR_STYLES)[number]['id']
@@ -31,10 +30,15 @@ export interface ParsedAvatar {
   bg: string
 }
 
+/** Styles that were removed. Avatars made with them keep working as these. */
+const RETIRED: Record<string, AvatarStyle> = { personas: 'adventurer' }
+
 export function parseAvatar(id: string | null | undefined): ParsedAvatar | null {
   const m = id ? AVATAR_RE.exec(id) : null
-  if (!m || !STYLE_IDS.includes(m[1])) return null
-  return { style: m[1] as AvatarStyle, seed: m[2], bg: m[3] }
+  if (!m) return null
+  const style = RETIRED[m[1]] ?? m[1]
+  if (!STYLE_IDS.includes(style)) return null
+  return { style: style as AvatarStyle, seed: m[2], bg: m[3] }
 }
 
 export function makeAvatarId(style: AvatarStyle, seed: string, bg: string) {
