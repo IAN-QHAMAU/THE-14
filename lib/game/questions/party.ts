@@ -3,7 +3,8 @@ import type { BluffQuestion, MostLikelyQuestion, WouldRatherQuestion } from './s
 // ─── More Would You Rather, Most Likely To and Bluff ──────────────────────
 
 function wr(id: string, a: string, b: string): WouldRatherQuestion {
-  return { id, type: 'wouldrather', category: 'party', question: 'Would you rather…', options: [a, b], points: 100, speedBonus: 0 }
+  // A matter of taste, so it is worth less than a real answer.
+  return { id, type: 'wouldrather', category: 'party', question: 'Would you rather…', options: [a, b], points: 50, speedBonus: 0 }
 }
 
 export const MORE_WOULD_RATHER: WouldRatherQuestion[] = [

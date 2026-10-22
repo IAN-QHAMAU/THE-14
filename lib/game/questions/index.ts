@@ -256,6 +256,7 @@ export function toPublicQuestion(q: Question, roundData?: RoundData): PublicQues
   switch (q.type) {
     case 'choice':
     case 'truefalse':
+    case 'oddone':
       return { ...base, options: q.options }
     case 'emoji':
       return { ...base, options: q.options, emoji: q.emoji }

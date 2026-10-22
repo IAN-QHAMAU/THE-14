@@ -73,6 +73,8 @@ export interface RevealPayload {
   correct_order?: string[]
   fully_correct?: number
   option_authors?: string[][]
+  /** Odd One Out: why the answer is the odd one. */
+  explain?: string
   results: Record<string, PlayerResult>
   rank_before: Record<string, number>
   rank_after: Record<string, number>
@@ -172,7 +174,9 @@ export function gradeRound(input: {
     case 'choice':
     case 'truefalse':
     case 'emoji':
-    case 'picture': {
+    case 'picture':
+    case 'oddone': {
+      if (q.type === 'oddone') reveal.explain = q.why
       reveal.options = q.options
       reveal.correct_index = q.correct
       reveal.correct_indices = [q.correct]

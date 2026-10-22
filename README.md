@@ -81,9 +81,10 @@ Open [http://localhost:3000](http://localhost:3000)
 | Picture Round | A flag starts blurred and zoomed in, then sharpens. Earlier is harder. |
 | Closest Wins | Guess a number with a slider. Closest gets the most points. |
 | Put in Order | Tap four items in the right order |
+| Odd One Out | Four things, one does not belong. The reveal says why. |
 | Most Likely To | Party mode. Vote for a player. Side with the room to score. |
 | Bluff | Party mode. Everyone writes a fake answer, then tries to find the real one. Points for every player your fake fools. |
-| Would You Rather | Party mode. Pick one of two options. Side with the room to score. |
+| Would You Rather | Party mode. Pick one of two options. Side with the room to score. Worth half points, since it is a matter of taste. |
 
 Party rounds are capped at about one in six questions and never open the game.
 

@@ -154,6 +154,12 @@ export function RevealBoard({ reveal, question, players, myPlayerId, myChoice, s
           )
         })}
       </div>
+
+      {reveal.explain && (
+        <p className={cn('animate-fade-up', muted, stage ? 'text-lg' : 'text-sm')} style={{ animationDelay: `${options.length * 90 + 200}ms` }}>
+          {reveal.explain}
+        </p>
+      )}
     </div>
   )
 }

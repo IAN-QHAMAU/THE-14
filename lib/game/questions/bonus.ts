@@ -225,7 +225,8 @@ export const BONUS_MOST_LIKELY: MostLikelyQuestion[] = [
 ]
 
 function wr(id: string, a: string, b: string): WouldRatherQuestion {
-  return { id, type: 'wouldrather', category: 'party', question: 'Would you rather…', options: [a, b], points: 100, speedBonus: 0 }
+  // A matter of taste, so it is worth less than a real answer.
+  return { id, type: 'wouldrather', category: 'party', question: 'Would you rather…', options: [a, b], points: 50, speedBonus: 0 }
 }
 
 export const WOULD_RATHER: WouldRatherQuestion[] = [

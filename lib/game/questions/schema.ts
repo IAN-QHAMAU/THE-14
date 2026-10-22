@@ -10,6 +10,7 @@ export type QuestionType =
   | 'mostlikely'
   | 'bluff'
   | 'wouldrather'
+  | 'oddone'
 
 export type Category =
   // Brain
@@ -108,6 +109,14 @@ export interface BluffQuestion extends BaseQuestion {
   decoys: string[]
 }
 
+export interface OddOneQuestion extends BaseQuestion {
+  type: 'oddone'
+  options: string[]
+  correct: number
+  /** Shown at the reveal: what the other three have in common. */
+  why: string
+}
+
 export interface WouldRatherQuestion extends BaseQuestion {
   type: 'wouldrather'
   /** Exactly two choices. */
@@ -116,6 +125,7 @@ export interface WouldRatherQuestion extends BaseQuestion {
 
 export type Question =
   | WouldRatherQuestion
+  | OddOneQuestion
   | ChoiceQuestion
   | EmojiQuestion
   | PictureQuestion
@@ -128,7 +138,7 @@ export type Question =
 export type RawChoiceQuestion = Omit<ChoiceQuestion, 'type'> & { type?: 'choice' | 'truefalse' }
 
 /** Types that use the tap-an-option answer pad. */
-export const OPTION_TYPES: QuestionType[] = ['choice', 'truefalse', 'emoji', 'picture']
+export const OPTION_TYPES: QuestionType[] = ['choice', 'truefalse', 'emoji', 'picture', 'oddone']
 
 /** Types where a right answer exists and streaks count. */
 export function isGradedType(type: QuestionType) {
@@ -227,6 +237,7 @@ export const GAME_TYPES: Record<QuestionType, GameTypeInfo> = {
   picture:    { label: 'Picture Round',      short: 'Name the picture',  description: 'A blurred image sharpens over time.' },
   closest:    { label: 'Closest Wins',       short: 'Closest number',    description: 'Guess a number. Nearest gets the most.' },
   order:      { label: 'Put in Order',       short: 'Put in order',      description: 'Tap four items in the right order.' },
+  oddone:     { label: 'Odd One Out',        short: 'Spot the odd one',  description: 'Four things. One does not belong.' },
   mostlikely: { label: 'Most Likely To',     short: 'Vote a player',     description: 'Vote for a player. Side with the room.', party: true },
   bluff:      { label: 'Bluff',              short: 'Write a fake',      description: 'Write a fake answer, then find the real one.', party: true },
   wouldrather: { label: 'Would You Rather', short: 'Pick a side',       description: 'Two choices. Side with the room to score.', party: true },

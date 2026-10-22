@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 
 export const DEFAULT_SETTINGS: GameSettings = {
   categories: ['general', 'movies', 'football', 'africa'],
-  types: ['choice', 'truefalse', 'emoji', 'closest'],
+  types: ['choice', 'truefalse', 'emoji', 'closest', 'oddone'],
   timer: 20,
   questionCount: 12,
   difficulty: 'mixed',
