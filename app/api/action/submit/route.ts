@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth/session'
 import { createServerSupabase } from '@/lib/db/supabase'
 import { getCurrentRound, getMyActions } from '@/lib/db/queries'
 import { getQuestionById, OPTION_TYPES } from '@/lib/game/questions'
-import { TOO_FAST_MS, maxWager, normalizeText, type AnswerPayload } from '@/lib/game/scoring'
+import { TOO_FAST_MS, maxWager, normalizeText, tidyAnswer, type AnswerPayload } from '@/lib/game/scoring'
 import type { ActionType } from '@/types'
 
 /** Small allowance for network lag after the timer hits zero. */
@@ -48,6 +48,12 @@ export async function POST(req: NextRequest) {
     payload.value = Math.min(maxWager(me?.score ?? 0), Math.max(0, value))
   } else if (data.phase === 'pick' && playerId !== spot) {
     return fail('Hold on. Your turn is next.')
+  } else if (data.phase === 'pick' && typeof body.text === 'string') {
+    // Sync: the player who goes first can write their own answer.
+    const text = tidyAnswer(body.text.slice(0, 40))
+    if (!text) return fail('Write something first.')
+    actionType = 'pick'
+    payload.text = text
   } else if (question.type === 'sync' && data.phase === 'vote' && playerId === spot) {
     return fail('Sit back. They are guessing about you.')
   } else if (question.type === 'bluff' && round.status === 'active') {
@@ -72,6 +78,7 @@ export async function POST(req: NextRequest) {
     const options =
       question.type === 'mostlikely' ? data.players ?? []
       : question.type === 'bluff' ? data.options ?? []
+      : question.type === 'sync' && data.phase === 'vote' ? data.options ?? question.options
       : 'options' in question ? question.options : []
     const idx = Number(body.optionIndex)
     if (!Number.isInteger(idx) || idx < 0 || idx >= options.length) return fail('Invalid answer.')
@@ -89,12 +96,13 @@ export async function POST(req: NextRequest) {
 
   payload.too_fast = actionType === 'answer' && OPTION_TYPES.includes(question.type) && timeTakenMs < TOO_FAST_MS
 
-  const { error } = await createServerSupabase().from('actions').insert({
-    round_id: round.id,
-    player_id: playerId,
-    action_type: actionType,
-    payload,
-  })
+  const row = { round_id: round.id, player_id: playerId, action_type: actionType, payload }
+  const actions = createServerSupabase().from('actions')
+  // A bet can be changed until the betting time runs out; everything else is final.
+  const { error } =
+    actionType === 'wager'
+      ? await actions.upsert(row, { onConflict: 'round_id,player_id,action_type' })
+      : await actions.insert(row)
 
   if (error) {
     if (error.code === '23505') return fail('Already answered.')

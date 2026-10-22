@@ -113,7 +113,10 @@ export interface BluffQuestion extends BaseQuestion {
 
 export interface OddOneQuestion extends BaseQuestion {
   type: 'oddone'
+  /** Pictures (emoji), one per option. */
   options: string[]
+  /** What each picture is, shown at the reveal. */
+  names: string[]
   correct: number
   /** Shown at the reveal: what the other three have in common. */
   why: string
@@ -257,6 +260,8 @@ export interface GameTypeInfo {
   description: string
   /** Party types ignore the category filter. */
   party?: boolean
+  /** Not tied to a category, but scored and paced like a quiz round. */
+  anyCategory?: boolean
 }
 
 export const GAME_TYPES: Record<QuestionType, GameTypeInfo> = {
@@ -266,7 +271,7 @@ export const GAME_TYPES: Record<QuestionType, GameTypeInfo> = {
   picture:    { label: 'Picture Round',      short: 'Name the picture',  description: 'A blurred image sharpens over time.' },
   closest:    { label: 'Closest Wins',       short: 'Closest number',    description: 'Guess a number. Nearest gets the most.' },
   order:      { label: 'Put in Order',       short: 'Put in order',      description: 'Tap four items in the right order.' },
-  oddone:     { label: 'Odd One Out',        short: 'Spot the odd one',  description: 'Four things. One does not belong.' },
+  oddone:     { label: 'Odd One Out',        short: 'Spot the odd one',  description: 'Four pictures. One does not belong.', anyCategory: true },
   fastest:    { label: 'Fastest Finger',     short: 'First right answer wins', description: 'Only the first right answer scores, and it scores double.' },
   mostlikely: { label: 'Most Likely To',     short: 'Vote a player',     description: 'Vote for a player. Side with the room.', party: true },
   bluff:      { label: 'Bluff',              short: 'Write a fake',      description: 'Write a fake answer, then find the real one.', party: true },

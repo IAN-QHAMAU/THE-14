@@ -96,6 +96,8 @@ export interface GameStateResponse {
   myWager: number | null
   /** Sync: your own answer, when you are on the spot. */
   myPick: number | null
+  /** Sync: your own written answer, if you wrote one. */
+  myPickText: string | null
   submissionStatus: Record<string, boolean>
   answeredCount: number
   reveal: RevealPayload | null

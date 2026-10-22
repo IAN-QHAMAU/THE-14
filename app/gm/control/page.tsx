@@ -185,7 +185,8 @@ export default function GMControlPage() {
       : spot ? state.answeredCount >= Math.max(1, here - 1)
       : here > 0 && state.answeredCount >= here
     const started = round.starts_at ? serverNow() >= Date.parse(round.starts_at) : true
-    const delay = allIn && started ? 1200 : Math.max(0, Date.parse(round.ends_at) - serverNow() + 800)
+    // Bets can be changed until time runs out, so betting always gets its full time.
+    const delay = allIn && started && phase !== 'wager' ? 1200 : Math.max(0, Date.parse(round.ends_at) - serverNow() + 800)
     const action = isFirstPhase(phase) ? 'start_voting' : 'lock_question'
     const t = setTimeout(() => {
       autoFired.current = key

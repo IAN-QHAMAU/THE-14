@@ -10,7 +10,7 @@ import {
   type Question,
   type RoundData,
 } from '@/lib/game/questions'
-import { buildBluffOptions, computeAwards, computePlayerStats, computeRanks, computeTags, gradeRound } from '@/lib/game/scoring'
+import { buildBluffOptions, buildSyncOptions, computeAwards, computePlayerStats, computeRanks, computeTags, gradeRound } from '@/lib/game/scoring'
 import { isActive } from '@/lib/presence'
 import type { Game, GameStatus, Player, Round, RoundStatus } from '@/types'
 
@@ -199,6 +199,9 @@ export async function startSecondPhase(game: Game, round: Round) {
   const data: RoundData = { ...round.data, phase: 'vote' }
   if (question.type === 'bluff' && phase === 'write') {
     data.options = buildBluffOptions(question, actions.filter((a) => a.action_type === 'bluff'), round.id)
+  }
+  if (question.type === 'sync' && phase === 'pick') {
+    data.options = buildSyncOptions(question.options, actions.find((a) => a.action_type === 'pick')?.payload, round.id)
   }
   // Nobody to guess about if the player who goes first never answered.
   if (phase === 'pick' && !actions.some((a) => a.action_type === 'pick')) return lockAndRevealQuestion(game.id, round)

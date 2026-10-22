@@ -5,7 +5,7 @@ import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
 import { TimerBar } from '@/components/ui/Countdown'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { GetReady } from '@/components/game/GetReady'
-import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PlayerVote, PromptExtras, SyncWait, WagerInput } from '@/components/game/answers'
+import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PicturePad, PlayerVote, PromptExtras, SyncPick, SyncWait, WagerInput } from '@/components/game/answers'
 import { serverNow, useServerNow } from '@/lib/clock'
 import { quickTapLine } from '@/lib/game/lines'
 import { maxWager } from '@/lib/game/scoring'
@@ -96,7 +96,8 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     : Boolean(serverAnswer) || pending !== null
   const armedAt = startsAt + ARM_DELAY_MS
   const armed = now >= armedAt
-  const locked = done || timeUp || busy
+  // Bets stay open to changes until time runs out.
+  const locked = phase === 'wager' ? timeUp || busy : done || timeUp || busy
   const cat = CATEGORIES[q.category]
   const type = GAME_TYPES[q.type]
 
@@ -141,12 +142,25 @@ export function QuestionScreen({ state, onSubmit }: Props) {
         onSubmit={(value) => submit({ value })}
       />
     )
+  } else if (q.type === 'sync' && phase === 'pick' && amSpot) {
+    body = (
+      <SyncPick
+        options={q.options ?? []}
+        selected={selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null}
+        written={pending?.text ?? state.myPickText}
+        disabled={locked}
+        onPick={(optionIndex) => submit({ optionIndex })}
+        onWrite={(text) => submit({ text })}
+      />
+    )
   } else if (q.type === 'sync' && phase === 'pick' && !amSpot) {
     body = <SyncWait avatar={spot?.avatar} title={`${spot?.name ?? 'Someone'} is answering`} text="Get ready. Your turn is next." />
   } else if (q.type === 'sync' && phase === 'vote' && amSpot) {
     body = <SyncWait avatar={spot?.avatar} title="Your answer is in" text="Now everyone is guessing what you picked." />
   } else if (q.type === 'bluff' && phase === 'write') {
     body = <BluffWrite disabled={timeUp || busy} submitted={state.myBluff} onSubmit={(text) => submit({ text })} />
+  } else if (q.type === 'oddone') {
+    body = <PicturePad pics={q.options ?? []} selected={selectedIndex} disabled={locked} onPick={(optionIndex) => submit({ optionIndex })} />
   } else if (q.type === 'mostlikely') {
     body = (
       <PlayerVote
@@ -192,7 +206,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     : note
       ? note
       : done
-        ? phase === 'write' ? 'Fake submitted.' : phase === 'wager' ? 'Bet placed.' : q.type === 'sync' && (amSpot || phase === 'pick') ? null : 'Locked in.'
+        ? phase === 'write' ? 'Fake submitted.' : phase === 'wager' ? 'Bet placed. You can change it until time runs out.' : q.type === 'sync' && (amSpot || phase === 'pick') ? null : 'Locked in.'
         : timeUp
           ? 'Time is up.'
           : null

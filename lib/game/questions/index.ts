@@ -9,8 +9,7 @@ import { HARD_TRUE_FALSE, HARD_EMOJI, HARD_CLOSEST, HARD_ORDER } from './hardTyp
 import { ANIME_PACKS } from './anime'
 import { FUN_QUESTIONS, FUN_TRUE_FALSE, FUN_EMOJI } from './fun'
 import { MORE_WOULD_RATHER, MORE_MOST_LIKELY, MORE_BLUFF } from './party'
-import { ODD_ONE_A, type RawOddOne } from './oddoneA'
-import { ODD_ONE_B } from './oddoneB'
+import { ODD_ONE_PICS, type PicOddOne } from './oddonePics'
 import { SYNC } from './sync'
 import { TRUE_FALSE, EMOJI, PICTURE, CLOSEST, ORDER, MOST_LIKELY, BLUFF } from './special'
 import {
@@ -34,8 +33,19 @@ function normalize(q: RawChoiceQuestion): Question {
   return { ...q, type: q.type ?? 'choice' }
 }
 
-function oddOne(q: RawOddOne): Question {
-  return { ...q, type: 'oddone', question: 'Which one does not belong?', speedBonus: q.points / 2 }
+function oddOne(q: PicOddOne): Question {
+  return {
+    id: q.id,
+    type: 'oddone',
+    category: 'party',
+    question: 'Which one does not belong?',
+    options: q.pics,
+    names: q.names,
+    correct: q.correct,
+    why: q.why,
+    points: q.points,
+    speedBonus: q.points / 2,
+  }
 }
 
 export const ALL_QUESTIONS: Question[] = [
@@ -63,8 +73,7 @@ export const ALL_QUESTIONS: Question[] = [
   ...MORE_WOULD_RATHER,
   ...MORE_MOST_LIKELY,
   ...MORE_BLUFF,
-  ...ODD_ONE_A.map(oddOne),
-  ...ODD_ONE_B.map(oddOne),
+  ...ODD_ONE_PICS.map(oddOne),
   ...SYNC,
   ...TRUE_FALSE,
   ...EMOJI,
@@ -101,7 +110,7 @@ export function buildPool(settings: Pick<GameSettings, 'categories' | 'types'>):
   const types = new Set(settings.types)
   return [...ALL_QUESTIONS, ...(types.has('fastest') ? FASTEST : [])].filter((q) => {
     if (!types.has(q.type)) return false
-    if (GAME_TYPES[q.type].party) return true
+    if (GAME_TYPES[q.type].party || GAME_TYPES[q.type].anyCategory) return true
     return cats.has(q.category)
   })
 }
@@ -286,7 +295,7 @@ export function toPublicQuestion(q: Question, roundData?: RoundData): PublicQues
       return { ...base, options: q.options }
     case 'sync': {
       const name = roundData?.sync?.name ?? 'someone'
-      return { ...base, question: q.question.replace('{name}', name), self: q.self, options: q.options }
+      return { ...base, question: q.question.replace('{name}', name), self: q.self, options: roundData?.options ?? q.options }
     }
     case 'emoji':
       return { ...base, options: q.options, emoji: q.emoji }
