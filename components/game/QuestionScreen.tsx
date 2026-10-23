@@ -8,7 +8,7 @@ import { GetReady } from '@/components/game/GetReady'
 import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PicturePad, PlayerVote, PromptExtras, SyncPick, SyncWait, WagerInput } from '@/components/game/answers'
 import { serverNow, useServerNow } from '@/lib/clock'
 import { quickTapLine } from '@/lib/game/lines'
-import { maxWager } from '@/lib/game/scoring'
+import { FADING_TYPES, FULL_POINTS_MS, fadeFactor, maxWager } from '@/lib/game/scoring'
 import { sound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 import type { GameStateResponse } from '@/types'
@@ -226,6 +226,18 @@ export function QuestionScreen({ state, onSubmit }: Props) {
         </header>
 
         <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} ticking={!done} />
+        {FADING_TYPES.includes(q.type) && phase !== 'wager' && !done && !timeUp && (
+          // What a right answer is worth right now. Points start fading after a few seconds.
+          <p className="-mt-3 flex justify-between text-xs text-stone-400 tabular-nums">
+            <span>{now - startsAt < FULL_POINTS_MS ? 'Full points' : 'Points fading'}</span>
+            <span>
+              Worth{' '}
+              <span className="text-stone-700 font-medium">
+                {Math.round((q.type === 'fastest' ? q.points * 2 : q.points) * fadeFactor(Math.max(0, now - startsAt), endsAt - startsAt))}
+              </span>
+            </span>
+          </p>
+        )}
 
         <div className="animate-fade-up space-y-3">
           <h2 className="text-xl font-medium text-stone-900 leading-snug">

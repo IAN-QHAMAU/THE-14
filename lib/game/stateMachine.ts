@@ -248,7 +248,8 @@ export async function lockAndRevealQuestion(gameId: string, round: Round) {
   ])
   const players = (playerRows ?? []) as { id: string; score: number; streak: number; best_streak: number }[]
 
-  const graded = gradeRound({ question, data: round.data ?? {}, answers, players })
+  const windowMs = round.starts_at && round.ends_at ? Date.parse(round.ends_at) - Date.parse(round.starts_at) : 0
+  const graded = gradeRound({ question, data: round.data ?? {}, answers, players, windowMs })
 
   const before = Object.fromEntries(players.map((p) => [p.id, p.score]))
   // A lost bet can take points away, but never below zero.
