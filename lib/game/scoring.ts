@@ -20,22 +20,6 @@ export const FOOL_POINTS = 75
 /** Points the Sync player earns for each friend who reads them right. */
 export const READ_POINTS = 50
 
-/**
- * Points fade with time, so knowing beats looking it up. A right answer is
- * worth full points for the first few seconds, then slides down to a floor
- * at the buzzer. Bonuses on top (speed, streak, bets) do not fade.
- */
-export const FULL_POINTS_MS = 3000
-export const FADE_FLOOR = 0.4
-/** Quiz modes that fade. Party modes have nothing to look up. */
-export const FADING_TYPES: QuestionType[] = ['choice', 'truefalse', 'emoji', 'picture', 'oddone', 'fastest', 'closest', 'order']
-
-export function fadeFactor(timeMs: number, windowMs: number) {
-  if (!windowMs || timeMs <= FULL_POINTS_MS) return 1
-  const span = Math.max(1, windowMs - FULL_POINTS_MS)
-  return Math.max(FADE_FLOOR, 1 - (1 - FADE_FLOOR) * ((timeMs - FULL_POINTS_MS) / span))
-}
-
 /** Final Wager: bet up to half your points, and at least 200 so everyone can play. */
 export function maxWager(score: number) {
   return Math.max(200, Math.floor(score / 2))
@@ -223,12 +207,8 @@ export function gradeRound(input: {
   data: RoundData
   answers: AnswerRow[]
   players: GradePlayer[]
-  /** How long the answer window was, for fading points. */
-  windowMs?: number
 }): Omit<RevealPayload, 'rank_before' | 'rank_after'> {
   const { question: q, data, players } = input
-  // Share of the question's points a right answer still earns at its time.
-  const fade = (a: AnswerRow) => (FADING_TYPES.includes(q.type) ? fadeFactor(a.payload.time_taken_ms ?? 0, input.windowMs ?? 0) : 1)
   const answers = input.answers.filter((a) => a.action_type === 'answer')
   const writes = input.answers.filter((a) => a.action_type === 'bluff')
   const byPlayer = new Map(answers.map((a) => [a.player_id, a]))
@@ -263,7 +243,7 @@ export function gradeRound(input: {
       reveal.answer_stats = stats(counts, answers.length)
       const right = answers.filter((a) => a.payload.option_index === q.correct).sort(byTime)
       right.forEach((a, rank) => {
-        graded.set(a.player_id, { correct: true, points: Math.round(q.points * fade(a)) + speedBonusFor(rank, q.speedBonus) })
+        graded.set(a.player_id, { correct: true, points: q.points + speedBonusFor(rank, q.speedBonus) })
       })
       for (const a of answers) if (!graded.has(a.player_id)) graded.set(a.player_id, { correct: false, points: 0 })
       break
@@ -284,7 +264,7 @@ export function gradeRound(input: {
       const right = answers.filter((a) => a.payload.option_index === q.correct).sort(byTime)
       reveal.first_player_id = right[0]?.player_id
       right.forEach((a, rank) => {
-        graded.set(a.player_id, { correct: true, points: rank === 0 ? Math.round(q.points * 2 * fade(a)) : 0, extra: { first: rank === 0 } })
+        graded.set(a.player_id, { correct: true, points: rank === 0 ? q.points * 2 : 0, extra: { first: rank === 0 } })
       })
       for (const a of answers) if (!graded.has(a.player_id)) graded.set(a.player_id, { correct: false, points: 0 })
       break
@@ -325,16 +305,16 @@ export function gradeRound(input: {
       const range = Math.max(1, q.max - q.min)
       const guesses = answers
         .filter((a) => typeof a.payload.value === 'number')
-        .map((a) => ({ player_id: a.player_id, value: a.payload.value!, diff: Math.abs(a.payload.value! - q.answer), f: fade(a) }))
+        .map((a) => ({ player_id: a.player_id, value: a.payload.value!, diff: Math.abs(a.payload.value! - q.answer) }))
         .sort((a, b) => a.diff - b.diff)
-      reveal.guesses = guesses.map(({ f: _f, ...g }) => g)
+      reveal.guesses = guesses
       const best = guesses.length ? guesses[0].diff : Infinity
       for (const g of guesses) {
         const closeness = Math.max(0, 1 - g.diff / (range * 0.2))
         const isBest = g.diff === best
         graded.set(g.player_id, {
           correct: isBest || closeness >= 0.75,
-          points: Math.round(q.points * closeness * g.f) + (isBest ? q.speedBonus : 0),
+          points: Math.round(q.points * closeness) + (isBest ? q.speedBonus : 0),
           extra: { guess: g.value, diff: g.diff },
         })
       }
@@ -358,8 +338,8 @@ export function gradeRound(input: {
         graded.set(s.a.player_id, {
           correct: s.positions === n,
           points: s.positions === n
-            ? Math.round(q.points * fade(s.a)) + speedBonusFor(rank, q.speedBonus)
-            : Math.round(q.points * 0.5 * (s.positions / n) * fade(s.a)),
+            ? q.points + speedBonusFor(rank, q.speedBonus)
+            : Math.round(q.points * 0.5 * (s.positions / n)),
           extra: { positions: s.positions },
         })
       }
