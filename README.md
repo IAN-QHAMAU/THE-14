@@ -120,7 +120,7 @@ Every question is easy (100 points), medium (150) or hard (200 and up). Players 
 
 | Result | Points |
 |---|---|
-| Correct answer | 100 to 200 (varies by question), fading with time in quiz modes (see below) |
+| Correct answer | 100 to 200 (varies by question) |
 | 1st, 2nd, 3rd fastest correct | Full, half, quarter speed bonus |
 | Streak of 3 or more correct | +50 per question while it lasts |
 | Closest Wins | Up to full points depending on how close, plus a bonus for the closest guess |
@@ -130,8 +130,6 @@ Every question is easy (100 points), medium (150) or hard (200 and up). Players 
 | Wrong or no answer | 0 |
 
 Answer time is measured on the server from the moment the question opens, so it cannot be faked from a phone. A tap under 1.2 seconds is marked "too fast".
-
-**Points fade with time.** In quiz modes (Classic, True or False, Emoji, Picture, Odd One Out, Fastest Finger, Closest Wins and Put in Order) a right answer earns full points for the first 3 seconds, then slides down to 40% at the buzzer. Speed, streak and Final Wager bonuses do not fade, and party modes never fade. Knowing beats looking it up: a 200 point question answered at 6 seconds of 20 is worth 179, at 15 seconds 115. Phones show what a right answer is worth while the timer runs.
 
 At the end, awards go to the sharpest mind, the fastest finger, the hottest streak, the biggest comeback, the boldest guesser and the best bluffer.
 
