@@ -125,6 +125,11 @@ export async function GET() {
     // A written answer counts as picked too (-1: not one of the options).
     myPick: mine.pick?.option_index ?? (mine.pick?.text ? -1 : null),
     myPickText: mine.pick?.text ?? null,
+    // Sketch: only the artist sees the word while the round is live.
+    myWord:
+      question?.type === 'sketch' && round?.data?.sync?.id === playerId && game.status === 'active'
+        ? question.word
+        : null,
     teams,
     myCard: power && !isGameMaster ? power.held[playerId] ?? null : null,
     myEffects: fx && !isGameMaster

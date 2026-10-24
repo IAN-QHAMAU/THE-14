@@ -4,7 +4,7 @@ import { createServerSupabase } from '@/lib/db/supabase'
 import { getCurrentRound, getEventsOfTypes, getGameById, getMyActions } from '@/lib/db/queries'
 import { FREEZE_MS, powerState } from '@/lib/game/powers'
 import { getQuestionById, OPTION_TYPES } from '@/lib/game/questions'
-import { TOO_FAST_MS, maxWager, normalizeText, tidyAnswer, type AnswerPayload } from '@/lib/game/scoring'
+import { TOO_FAST_MS, maxWager, normalizeText, sketchClose, sketchMatch, tidyAnswer, type AnswerPayload } from '@/lib/game/scoring'
 import type { ActionType } from '@/types'
 
 /** Small allowance for network lag after the timer hits zero. */
@@ -64,6 +64,15 @@ export async function POST(req: NextRequest) {
     payload.text = text
   } else if (question.type === 'sync' && data.phase === 'vote' && playerId === spot) {
     return fail('Sit back. They are guessing about you.')
+  } else if (question.type === 'sketch') {
+    // Sketch: only a right guess is saved. Wrong ones just bounce back.
+    if (playerId === spot) return fail('You are the artist. Keep drawing.')
+    const text = String(body.text ?? '').trim().slice(0, 40)
+    if (!text) return fail('Type a guess first.')
+    if (!sketchMatch(text, question.word, question.alts)) {
+      return NextResponse.json({ success: false, wrong: true, close: sketchClose(text, question.word) })
+    }
+    payload.text = question.word
   } else if (question.type === 'bluff' && round.status === 'active') {
     const text = String(body.text ?? '').trim().slice(0, 60)
     if (!text) return fail('Write something first.')

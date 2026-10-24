@@ -70,7 +70,7 @@ export function QuestionResult({ state, onReact }: Props) {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs opacity-80">
               <span className="font-mono">{r && r.points < 0 ? `${r.points}` : `+${r?.points ?? 0}`}</span>
               {r?.streakBonus ? <span>🔥 {r.streak} in a row, +{r.streakBonus}</span> : null}
-              {r?.doubled ? <span>✌️ {r.correct ? 'Doubled' : 'Double Down cost 100'}</span> : null}
+              {r?.doubled ? <span>✌️ {r.points > 0 ? 'Doubled' : 'Double Down cost 100'}</span> : null}
               {r?.tooFast && r.correct === false ? <span>Too fast</span> : null}
               {r?.timeMs != null && reveal.type !== 'mostlikely' && reveal.type !== 'wouldrather' && reveal.type !== 'bluff' && reveal.type !== 'sync' ? <span>{(r.timeMs / 1000).toFixed(1)}s</span> : null}
             </div>

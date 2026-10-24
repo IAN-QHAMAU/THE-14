@@ -98,6 +98,8 @@ export interface GameStateResponse {
   myPick: number | null
   /** Sync: your own written answer, if you wrote one. */
   myPickText: string | null
+  /** Sketch: the word to draw, when you are the artist. */
+  myWord: string | null
   /** Team Battle: each player's side. */
   teams: Record<string, 'amber' | 'teal'>
   /** Power-ups: the card you hold, what is active on you this question, and the recent plays. */

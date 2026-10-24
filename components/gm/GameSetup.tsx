@@ -49,7 +49,7 @@ const PRESETS: { id: string; title: string; blurb: string; settings: GameSetting
     blurb: 'Quiz mixed with party rounds, then a Final Wager.',
     settings: {
       categories: ['movies', 'music', 'internet', 'afromusic', 'hiphop', 'series', 'football', 'kenya', 'food', 'throwback'],
-      types: ['choice', 'emoji', 'oddone', 'fastest', 'bluff', 'mostlikely', 'sync'],
+      types: ['choice', 'emoji', 'oddone', 'fastest', 'bluff', 'mostlikely', 'sync', 'sketch'],
       timer: 20,
       questionCount: 15,
       difficulty: 'mixed',

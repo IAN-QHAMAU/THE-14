@@ -5,6 +5,7 @@ import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
 import { TimerBar } from '@/components/ui/Countdown'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { GetReady } from '@/components/game/GetReady'
+import { SketchGuess, SketchPad } from '@/components/game/Sketch'
 import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PicturePad, PlayerVote, PromptExtras, SyncPick, SyncWait, WagerInput } from '@/components/game/answers'
 import { serverNow, useServerNow } from '@/lib/clock'
 import { quickTapLine } from '@/lib/game/lines'
@@ -87,6 +88,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     : isVote ? 'Voting time'
     : phase === 'pick' ? (amSpot ? 'You go first' : `${spot?.name ?? 'Someone'} goes first`)
     : q.type === 'sync' ? 'Your turn to guess'
+    : q.type === 'sketch' ? (amSpot ? 'You are drawing' : `${spot?.name ?? 'Someone'} is drawing`)
     : undefined
 
   if (now < startsAt) {
@@ -109,7 +111,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     phase === 'write' ? Boolean(state.myBluff)
     : phase === 'wager' ? state.myWager !== null || pending !== null
     : phase === 'pick' ? !amSpot || state.myPick !== null || pending !== null
-    : q.type === 'sync' && amSpot ? true
+    : (q.type === 'sync' || q.type === 'sketch') && amSpot ? true
     : Boolean(serverAnswer) || pending !== null
   const armedAt = startsAt + ARM_DELAY_MS
   const armed = now >= armedAt
@@ -183,6 +185,10 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     body = <SyncWait avatar={spot?.avatar} title={`${spot?.name ?? 'Someone'} is answering`} text="Get ready. Your turn is next." />
   } else if (q.type === 'sync' && phase === 'vote' && amSpot) {
     body = <SyncWait avatar={spot?.avatar} title="Your answer is in" text="Now everyone is guessing what you picked." />
+  } else if (q.type === 'sketch' && amSpot) {
+    body = <SketchPad roundId={round.id} word={state.myWord ?? ''} disabled={timeUp} />
+  } else if (q.type === 'sketch') {
+    body = <SketchGuess roundId={round.id} hint={q.hint} myName={myPlayer?.name ?? 'Someone'} solved={Boolean(serverAnswer)} disabled={timeUp || frozen} />
   } else if (q.type === 'bluff' && phase === 'write') {
     body = <BluffWrite disabled={timeUp || busy} submitted={state.myBluff} onSubmit={(text) => submit({ text })} />
   } else if (q.type === 'oddone') {
@@ -241,7 +247,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     : note
       ? note
       : done
-        ? phase === 'write' ? 'Fake submitted.' : phase === 'wager' ? 'Bet placed. You can change it until time runs out.' : q.type === 'sync' && (amSpot || phase === 'pick') ? null : 'Locked in.'
+        ? phase === 'write' ? 'Fake submitted.' : phase === 'wager' ? 'Bet placed. You can change it until time runs out.' : (q.type === 'sync' && (amSpot || phase === 'pick')) || q.type === 'sketch' ? null : 'Locked in.'
         : timeUp
           ? 'Time is up.'
           : null
@@ -272,7 +278,9 @@ export function QuestionScreen({ state, onSubmit }: Props) {
               ? `Last question: ${q.category === 'party' ? type.label : cat.label}. How much will you bet?`
               : phase === 'pick' && amSpot
                 ? q.self
-                : q.question}
+                : q.type === 'sketch' && amSpot
+                  ? 'Your turn to draw'
+                  : q.question}
           </h2>
           <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} />
         </div>
@@ -296,8 +304,8 @@ export function QuestionScreen({ state, onSubmit }: Props) {
           )}
           {phase !== 'pick' && (
             <p className="text-xs text-stone-400">
-              {state.answeredCount} of {q.type === 'sync' ? Math.max(1, totalPlayers - 1) : totalPlayers}{' '}
-              {phase === 'write' ? 'written' : phase === 'wager' ? 'bets in' : 'answered'}
+              {state.answeredCount} of {q.type === 'sync' || q.type === 'sketch' ? Math.max(1, totalPlayers - 1) : totalPlayers}{' '}
+              {phase === 'write' ? 'written' : phase === 'wager' ? 'bets in' : q.type === 'sketch' ? 'got it' : 'answered'}
             </p>
           )}
         </footer>

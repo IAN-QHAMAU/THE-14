@@ -11,6 +11,7 @@ import { ShareCard } from '@/components/game/ShareCard'
 import { TeamBanner, TeamBar } from '@/components/game/Teams'
 import { TEAMS, TEAM_IDS } from '@/lib/game/teams'
 import { PromptExtras } from '@/components/game/answers'
+import { SketchStage } from '@/components/game/Sketch'
 import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
 import { useEffect, useState } from 'react'
 import { useServerNow } from '@/lib/clock'
@@ -140,6 +141,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
     : isVote ? 'Voting time'
     : phase === 'pick' ? `${spot?.name ?? 'Someone'} goes first`
     : q.type === 'sync' ? 'Time to guess'
+    : q.type === 'sketch' ? `${spot?.name ?? 'Someone'} is drawing`
     : undefined
 
   // ── Reveal ───────────────────────────────────────────────────────────────
@@ -207,7 +209,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 
       {round.starts_at && round.ends_at && <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} dark ticking />}
 
-      {spot && (
+      {spot && q.type !== 'sketch' && (
         <div className="flex items-center gap-4">
           <AvatarDisplay avatarId={spot.avatar} size="xl" idle />
           <p className="text-xl text-stone-300">{spot.name} goes first</p>
@@ -226,6 +228,8 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         <p className="text-lg text-stone-400">{spot?.name ?? 'They'} is answering on their phone. Everyone else guesses next.</p>
       ) : isWrite ? (
         <p className="text-lg text-stone-400">Players are writing their fakes on their phones.</p>
+      ) : q.type === 'sketch' ? (
+        <SketchStage roundId={round.id} hint={q.hint} artist={spot?.name} size={size} />
       ) : q.type === 'oddone' ? (
         <div className="grid grid-cols-4 gap-4 max-w-3xl">
           {(q.options ?? []).map((pic, i) => (
@@ -277,7 +281,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         <span className="text-sm text-stone-400">
           {phase === 'pick'
             ? `Waiting for ${spot?.name ?? 'them'}`
-            : `${state.answeredCount} of ${spot ? Math.max(1, players.length - 1) : players.length} ${isWrite ? 'written' : phase === 'wager' ? 'bets in' : 'answered'}`}
+            : `${state.answeredCount} of ${spot ? Math.max(1, players.length - 1) : players.length} ${isWrite ? 'written' : phase === 'wager' ? 'bets in' : q.type === 'sketch' ? 'got it' : 'answered'}`}
         </span>
       </div>
     </div>

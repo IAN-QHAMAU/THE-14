@@ -155,6 +155,7 @@ export async function startNextQuestion(game: Game, players: Player[]): Promise<
     data.players = (here.length ? here : everyone).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar }))
   }
   if (question.type === 'bluff') data.phase = 'write'
+  if (question.type === 'sketch') data.sync = await pickSync(game.id, players)
   if (question.type === 'sync') {
     data.sync = await pickSync(game.id, players)
     data.phase = 'pick'
@@ -276,12 +277,15 @@ export async function lockAndRevealQuestion(gameId: string, round: Round) {
     for (const id of power.effects[round.round_number]?.doubled ?? []) {
       const r = graded.results[id]
       if (!r) continue
-      r.points = r.correct ? r.points * 2 : r.points - DOUBLE_DOWN_LOSS
+      // Vote rounds have no right answer: siding with the room counts as a win.
+      const won = r.correct === true || (r.correct === null && r.points > 0)
+      r.points = won ? r.points * 2 : r.points - DOUBLE_DOWN_LOSS
       r.doubled = true
     }
     for (const p of players) {
       const r = graded.results[p.id]
-      if (!r?.correct || !r.streak || r.streak % STREAK_FOR_CARD !== 0 || power.held[p.id]) continue
+      // Only a streak that just grew counts (party rounds leave it as it was).
+      if (!r?.correct || r.streak <= (p.streak ?? 0) || r.streak % STREAK_FOR_CARD !== 0 || power.held[p.id]) continue
       const card = POWER_IDS[Math.floor(Math.random() * POWER_IDS.length)]
       r.earned = card
       earned.push({ id: p.id, card })
