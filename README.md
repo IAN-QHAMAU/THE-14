@@ -61,9 +61,6 @@ Open [http://localhost:3000](http://localhost:3000)
 **No duplicate players:** joining again from the same phone gives you your own seat back. Joining with the name of a player who has gone quiet takes that seat back with its score, which also lets people rejoin a game in progress. If that name belongs to someone still active, the joiner is asked to add an initial. Phones check in quietly in the background; players who stop checking in show as faded "away", do not hold up auto reveal and are left out of Most Likely To. The host can remove anyone with the × in the players list.
 
 ### Players
-
-New players can read the player manual at `/manual` (linked from the join page). It lives in `public/manual.html`.
-
 1. Go to `/join` on their phone
 2. Enter the game code and a name, then build an avatar (7 styles, colours, endless looks). Characters react during the game: they smile when you are right, sulk when you are wrong, sway gently in the lobby and cheer or droop as the standings move.
 3. Wait in the lobby until the GM starts
