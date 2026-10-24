@@ -87,7 +87,7 @@ Open [http://localhost:3000](http://localhost:3000)
 | Bluff | Party mode. Everyone writes a fake answer, then tries to find the real one. Points for every player your fake fools. |
 | Would You Rather | Party mode. Pick one of two options. Side with the room to score. Worth half points, since it is a matter of taste. |
 | Sync | Party mode. How in sync is the room? Try it and see. |
-| Sketch | Party mode. One player draws a secret word on their phone while it appears live on the big screen. Everyone else types guesses: earlier right guesses score more, and the artist earns 40 for each player who gets it. |
+| Sketch | Party mode. One player has 60 seconds to draw a secret word on their phone while it appears live on the big screen. Everyone else types guesses: earlier right guesses score more, and the artist earns 40 for each player who gets it. |
 
 Typed answers (Bluff fakes, Sync answers) are shown in one house style: a capital first letter, no full stop at the end and shouting calmed down, so nobody can spot an answer by how it was typed.
 
@@ -95,7 +95,7 @@ Party rounds are capped at about one in six questions and never open the game.
 
 **Final Wager:** a switch in setup. The last question becomes a bet: everyone stakes up to half their points (at least 200) before seeing it, then wins or loses the bet. Bets can be changed until the betting time runs out. Scores never drop below zero.
 
-**Team Battle:** a switch in setup. Players tap Team Amber or Team Teal in the lobby and can switch until the start; anyone who has not picked joins the smaller team. Teams are ranked by average points per player, shown on the standings, and the podium names the winning team.
+**Team Battle:** a switch in setup. Players tap Team Amber or Team Teal in the lobby and can switch until the start; anyone who has not picked joins the smaller team. The first player on each side is its captain (if they switch away, the next longest member takes over) and can rename the team and pick its icon. Teams are ranked by average points per player. In a Team Battle the standings show the teams, each with its players and their points, the final screen crowns the winning team, and there is a Team card to share.
 
 **Power-ups:** a switch in setup. Every 3 right answers in a row earns a random card (you hold one at a time), played between questions for the next question: Freeze (the target waits 5 seconds before answering), Steal (take 50 points from the player just above you), Shuffle (the target's answer buttons keep jumping), Shield (blocks the next card played on you) and Double Down (right counts double, wrong costs 100). Every play shows up on the big screen and on phones.
 

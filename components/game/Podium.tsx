@@ -13,11 +13,13 @@ interface Props {
   myPlayerId?: string
   size?: 'phone' | 'stage'
   children?: React.ReactNode
+  /** Replaces the podium, like the Team Battle finale. */
+  hero?: React.ReactNode
 }
 
 const PLACE = ['1st', '2nd', '3rd']
 
-export function Podium({ scores, awards = [], tags = {}, myPlayerId, size = 'phone', children }: Props) {
+export function Podium({ scores, awards = [], tags = {}, myPlayerId, size = 'phone', children, hero }: Props) {
   const [step, setStep] = useState(0)
   const stage = size === 'stage'
 
@@ -50,6 +52,8 @@ export function Podium({ scores, awards = [], tags = {}, myPlayerId, size = 'pho
 
   return (
     <div className={cn('w-full mx-auto flex flex-col gap-10', stage ? 'max-w-3xl' : 'max-w-md')}>
+      {hero ?? (
+      <>
       <header className="text-center animate-fade-up">
         <p className="text-xs tracking-widest uppercase text-stone-500">Final results</p>
         <h1 className={cn('font-light mt-1 text-stone-50', stage ? 'text-5xl' : 'text-3xl')}>THE 14</h1>
@@ -101,6 +105,8 @@ export function Podium({ scores, awards = [], tags = {}, myPlayerId, size = 'pho
           )
         })}
       </section>
+      </>
+      )}
 
       {step >= 4 && awards.length > 0 && (
         <section className="space-y-2 animate-fade-up">
@@ -123,7 +129,7 @@ export function Podium({ scores, awards = [], tags = {}, myPlayerId, size = 'pho
         </section>
       )}
 
-      {step >= 4 && rest.length > 0 && (
+      {step >= 4 && !hero && rest.length > 0 && (
         <section className="space-y-1.5 animate-fade-up">
           <p className="text-xs tracking-widest uppercase text-stone-500 mb-2">Everyone else</p>
           {rest.map((entry, index) => {

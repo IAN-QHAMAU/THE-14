@@ -146,8 +146,18 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) 
   return t + '…'
 }
 
+export interface ShareCardTeam {
+  name: string
+  icon: string
+  colour: string
+  average: number
+  members: PlayerScoreEntry[]
+}
+
 export interface ShareCardInput {
-  mode: 'player' | 'group'
+  mode: 'player' | 'group' | 'team'
+  /** Team Battle: both teams, the winner first. */
+  battle?: [ShareCardTeam, ShareCardTeam]
   /** Required for the player card. */
   me?: PlayerScoreEntry
   scores: PlayerScoreEntry[]
@@ -637,6 +647,157 @@ async function groupCard(c: Ctx, input: ShareCardInput) {
   await standings(c, input, rest, { top: tY - 10, bottom: tB - 20, title: '', details: rest.length <= 6 })
 }
 
+/** A team badge: the icon on a rounded tile in the team colour. */
+function crest(c: Ctx, team: ShareCardTeam, cx: number, cy: number, size: number) {
+  const { ctx, font } = c
+  const x = cx - size / 2
+  const y = cy - size / 2
+  ctx.save()
+  ctx.shadowColor = team.colour
+  ctx.shadowBlur = size * 0.45
+  roundRect(ctx, x, y, size, size, size * 0.28)
+  const g = ctx.createLinearGradient(x, y, x + size, y + size)
+  g.addColorStop(0, team.colour)
+  g.addColorStop(1, rgba(team.colour.replace('#', ''), 0.6))
+  ctx.fillStyle = g
+  ctx.fill()
+  ctx.restore()
+  // A thin light edge along the top, like a glossy badge.
+  roundRect(ctx, x + 3, y + 3, size - 6, size - 6, size * 0.26)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)'
+  ctx.lineWidth = 3
+  ctx.stroke()
+  ctx.font = `${Math.round(size * 0.56)}px ${font}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(team.icon, cx, cy + size * 0.04)
+  ctx.textBaseline = 'alphabetic'
+}
+
+/** Avatars in rows with names and points under each, centred. */
+async function lineup(c: Ctx, members: PlayerScoreEntry[], top: number, size: number, maxPerRow: number, mood: 'happy' | 'sad' | null, colour: string) {
+  const { ctx, font } = c
+  const sorted = [...members].sort((a, b) => b.total - a.total)
+  const perRow = Math.min(maxPerRow, Math.max(1, sorted.length))
+  const cell = Math.min(180, (W - PAD * 2 - 40) / perRow)
+  const rowH = size + 96
+  for (let i = 0; i < sorted.length; i++) {
+    const row = Math.floor(i / perRow)
+    const inRow = Math.min(perRow, sorted.length - row * perRow)
+    const col = i % perRow
+    const cx = W / 2 - (inRow * cell) / 2 + cell * col + cell / 2
+    const y = top + row * rowH
+    const s = sorted[i]
+    await drawAvatar(ctx, s.avatar, cx - size / 2, y, size, font, mood)
+    if (i === 0 && s.total > 0) {
+      // The team's top scorer gets a star.
+      ctx.font = `${Math.round(size * 0.32)}px ${font}`
+      ctx.textAlign = 'center'
+      ctx.fillText('⭐', cx + size * 0.38, y + size * 0.12)
+    }
+    ctx.textAlign = 'center'
+    ctx.fillStyle = C.soft
+    ctx.font = `500 ${Math.round(Math.max(24, size * 0.24))}px ${font}`
+    ctx.fillText(fitText(ctx, s.name, cell - 12), cx, y + size + 40)
+    ctx.fillStyle = i === 0 && s.total > 0 ? colour : C.muted
+    ctx.font = `500 ${Math.round(Math.max(21, size * 0.21))}px ui-monospace, monospace`
+    ctx.fillText(s.total.toLocaleString(), cx, y + size + 74)
+  }
+  return top + Math.ceil(sorted.length / perRow) * rowH
+}
+
+async function teamCard(c: Ctx, input: ShareCardInput) {
+  const { ctx, font } = c
+  const [win, lose] = input.battle!
+  const tie = win.average === lose.average
+
+  // The winning colour lights the top of the card.
+  clipToCard(ctx, () => {
+    const glow = ctx.createRadialGradient(W / 2, SAFE_TOP + 330, 0, W / 2, SAFE_TOP + 330, 620)
+    glow.addColorStop(0, rgba(win.colour.replace('#', ''), tie ? 0.12 : 0.3))
+    glow.addColorStop(1, rgba(win.colour.replace('#', ''), 0))
+    ctx.fillStyle = glow
+    ctx.fillRect(0, 0, W, H)
+    // Light rays fanning out from behind the crest.
+    ctx.save()
+    ctx.translate(W / 2, SAFE_TOP + 330)
+    for (let i = 0; i < 18; i++) {
+      ctx.rotate((Math.PI * 2) / 18)
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(-40, -760)
+      ctx.lineTo(40, -760)
+      ctx.closePath()
+      ctx.fillStyle = rgba(win.colour.replace('#', ''), tie ? 0.02 : 0.045)
+      ctx.fill()
+    }
+    ctx.restore()
+  })
+
+  label(c, 'Team Battle  ·  Final', W / 2, SAFE_TOP + 120, 'center')
+  if (tie) {
+    crest(c, win, W / 2 - 110, SAFE_TOP + 330, 190)
+    crest(c, lose, W / 2 + 110, SAFE_TOP + 330, 190)
+  } else {
+    crest(c, win, W / 2, SAFE_TOP + 330, 250)
+  }
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = tie ? C.soft : win.colour
+  ctx.font = `600 26px ${font}`
+  spaced(ctx, 10)
+  ctx.fillText(tie ? 'DEAD HEAT' : 'CHAMPIONS', W / 2, SAFE_TOP + 540)
+  spaced(ctx, -2)
+  ctx.fillStyle = tie ? C.text : win.colour
+  let size = 110
+  ctx.font = `700 ${size}px ${font}`
+  const title = tie ? 'Nobody blinked' : win.name
+  while (ctx.measureText(title).width > W - PAD * 2 - 40 && size > 60) ctx.font = `700 ${(size -= 6)}px ${font}`
+  ctx.fillText(title, W / 2, SAFE_TOP + 650)
+  spaced(ctx, 0)
+
+  // The battle bar: each side's share of the combined average.
+  const barY = SAFE_TOP + 720
+  const barX = PAD + 20
+  const barW = W - (PAD + 20) * 2
+  const sum = win.average + lose.average
+  const split = sum ? barW * (win.average / sum) : barW / 2
+  roundRect(ctx, barX, barY, barW, 26, 13)
+  ctx.save()
+  ctx.clip()
+  ctx.fillStyle = win.colour
+  ctx.fillRect(barX, barY, split, 26)
+  ctx.fillStyle = lose.colour
+  ctx.fillRect(barX + split, barY, barW - split, 26)
+  ctx.restore()
+  ctx.font = `500 26px ${font}`
+  ctx.fillStyle = C.soft
+  ctx.textAlign = 'left'
+  ctx.fillText(`${win.icon} ${win.name}`, barX, barY + 70)
+  ctx.textAlign = 'right'
+  ctx.fillText(`${lose.name} ${lose.icon}`, barX + barW, barY + 70)
+  ctx.font = `500 24px ui-monospace, monospace`
+  ctx.fillStyle = C.muted
+  ctx.textAlign = 'left'
+  ctx.fillText(`${win.average.toLocaleString()} avg`, barX, barY + 108)
+  ctx.textAlign = 'right'
+  ctx.fillText(`${lose.average.toLocaleString()} avg`, barX + barW, barY + 108)
+
+  // The lineups: the winners big, the other side smaller.
+  const bigCount = win.members.length
+  const big = bigCount > 10 ? 96 : bigCount > 5 ? 116 : 140
+  let y = barY + 190
+  label(c, `${win.name}`, W / 2, y, 'center')
+  y = await lineup(c, win.members, y + 34, big, bigCount > 10 ? 6 : 5, tie ? null : 'happy', win.colour)
+  // The other side gets whatever room is left, but never so small it cannot be read.
+  const room = SAFE_BOTTOM - y - 90
+  const loseRows = Math.ceil(lose.members.length / 7)
+  const small = Math.max(72, Math.min(110, room / Math.max(1, loseRows) - 96))
+  y += 40
+  label(c, `${lose.name}`, W / 2, y, 'center')
+  await lineup(c, lose.members, y + 30, small, 7, tie ? null : 'sad', lose.colour)
+}
+
 export async function renderShareCard(input: ShareCardInput): Promise<Blob | null> {
   if (typeof document === 'undefined') return null
   if (input.mode === 'player' && !input.me) return null
@@ -653,12 +814,14 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob | nul
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
 
+  if (input.mode === 'team' && !input.battle) return null
   const accent = input.mode === 'player' ? accentOf(input.me?.avatar) : DEFAULT_ACCENT
   background(ctx, accent, input.mode === 'player' ? SAFE_TOP + 260 : SAFE_TOP + 380)
   cardBody(ctx)
   const c = { ctx, font }
   header(c)
   if (input.mode === 'player') await playerCard(c, input)
+  else if (input.mode === 'team') await teamCard(c, input)
   else await groupCard(c, input)
   footer(c)
 
