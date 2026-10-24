@@ -120,6 +120,14 @@ export function resultLine(
       : { headline: pickLine('syncNobody', seed), tone: 'neutral' }
   }
 
+  // Sketch: the artist sees how many people got their drawing.
+  if (r?.guessedBy !== undefined) {
+    return r.guessedBy
+      ? { headline: `${r.guessedBy} ${r.guessedBy === 1 ? 'person' : 'people'} got your drawing.`, tone: 'good' }
+      : { headline: 'Nobody got it. Picasso would understand.', tone: 'neutral' }
+  }
+  if (type === 'sketch' && !r?.answered) return { headline: 'It got away from you.', tone: 'neutral' }
+
   if (!r || (!r.answered && !r.fooled)) {
     if (type === 'mostlikely' || type === 'wouldrather') return { headline: 'No vote.', tone: 'neutral' }
     const bet = r ? betLine(r, seed) : undefined
@@ -137,6 +145,9 @@ export function resultLine(
       return r.correct
         ? { headline: pickLine('syncRight', seed), tone: 'good' }
         : { headline: pickLine('syncWrong', seed), tone: 'neutral' }
+
+    case 'sketch':
+      return { headline: r.points >= 170 ? 'Straight away. Sharp eyes.' : 'Got it.', tone: 'good' }
 
     case 'mostlikely':
     case 'wouldrather':

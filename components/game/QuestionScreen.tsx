@@ -5,10 +5,12 @@ import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
 import { TimerBar } from '@/components/ui/Countdown'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { GetReady } from '@/components/game/GetReady'
+import { SketchGuess, SketchPad } from '@/components/game/Sketch'
 import { BluffWrite, ClosestInput, OptionPad, OrderPicker, PicturePad, PlayerVote, PromptExtras, SyncPick, SyncWait, WagerInput } from '@/components/game/answers'
 import { serverNow, useServerNow } from '@/lib/clock'
 import { quickTapLine } from '@/lib/game/lines'
 import { maxWager } from '@/lib/game/scoring'
+import { FREEZE_MS } from '@/lib/game/powers'
 import { sound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 import type { GameStateResponse } from '@/types'
@@ -31,6 +33,22 @@ interface Props {
  * to whichever answer button appears under their finger.
  */
 const ARM_DELAY_MS = 500
+
+/** How often shuffled answer buttons jump to new places. */
+const SHUFFLE_MS = 2500
+
+/** A random order for n items, different from the identity when it can be. */
+function shuffled(n: number, seed: number) {
+  const order = Array.from({ length: n }, (_, i) => i)
+  let x = seed * 9301 + 49297
+  for (let i = n - 1; i > 0; i--) {
+    x = (x * 9301 + 49297) % 233280
+    const j = Math.floor((x / 233280) * (i + 1))
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  if (n > 1 && order.every((v, i) => v === i)) order.push(order.shift()!)
+  return order
+}
 
 export function QuestionScreen({ state, onSubmit }: Props) {
   const { currentRound: round, currentQuestion: q, game, myPlayer } = state
@@ -70,6 +88,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     : isVote ? 'Voting time'
     : phase === 'pick' ? (amSpot ? 'You go first' : `${spot?.name ?? 'Someone'} goes first`)
     : q.type === 'sync' ? 'Your turn to guess'
+    : q.type === 'sketch' ? (amSpot ? 'You are drawing' : `${spot?.name ?? 'Someone'} is drawing`)
     : undefined
 
   if (now < startsAt) {
@@ -92,7 +111,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     phase === 'write' ? Boolean(state.myBluff)
     : phase === 'wager' ? state.myWager !== null || pending !== null
     : phase === 'pick' ? !amSpot || state.myPick !== null || pending !== null
-    : q.type === 'sync' && amSpot ? true
+    : (q.type === 'sync' || q.type === 'sketch') && amSpot ? true
     : Boolean(serverAnswer) || pending !== null
   const armedAt = startsAt + ARM_DELAY_MS
   const armed = now >= armedAt
@@ -130,6 +149,15 @@ export function QuestionScreen({ state, onSubmit }: Props) {
       ? (q.options ?? []).findIndex((o) => o.trim().toLowerCase() === state.myBluff!.trim().toLowerCase())
       : null
 
+  // Power-ups played on you for this question.
+  const fx = state.myEffects
+  const answerPhase = phase !== 'wager' && phase !== 'write' && phase !== 'pick'
+  const frozenUntil = fx?.frozen && answerPhase ? startsAt + FREEZE_MS : 0
+  const frozen = now < frozenUntil
+  const jumbled = Boolean(fx?.shuffled && answerPhase && !done && !timeUp)
+  const order = jumbled ? shuffled((q.options ?? []).length, Math.floor(now / SHUFFLE_MS)) : null
+  const view = (i: number | null) => (order && i !== null && i >= 0 ? order.indexOf(i) : i)
+
   let body: React.ReactNode
   if (phase === 'wager') {
     const score = state.myScore
@@ -157,10 +185,22 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     body = <SyncWait avatar={spot?.avatar} title={`${spot?.name ?? 'Someone'} is answering`} text="Get ready. Your turn is next." />
   } else if (q.type === 'sync' && phase === 'vote' && amSpot) {
     body = <SyncWait avatar={spot?.avatar} title="Your answer is in" text="Now everyone is guessing what you picked." />
+  } else if (q.type === 'sketch' && amSpot) {
+    body = <SketchPad roundId={round.id} word={state.myWord ?? ''} disabled={timeUp} />
+  } else if (q.type === 'sketch') {
+    body = <SketchGuess roundId={round.id} hint={q.hint} myName={myPlayer?.name ?? 'Someone'} solved={Boolean(serverAnswer)} disabled={timeUp || frozen} />
   } else if (q.type === 'bluff' && phase === 'write') {
     body = <BluffWrite disabled={timeUp || busy} submitted={state.myBluff} onSubmit={(text) => submit({ text })} />
   } else if (q.type === 'oddone') {
-    body = <PicturePad pics={q.options ?? []} selected={selectedIndex} disabled={locked} onPick={(optionIndex) => submit({ optionIndex })} />
+    const pics = q.options ?? []
+    body = (
+      <PicturePad
+        pics={order ? order.map((i) => pics[i]) : pics}
+        selected={view(selectedIndex)}
+        disabled={locked}
+        onPick={(i) => submit({ optionIndex: order ? order[i] : i })}
+      />
+    )
   } else if (q.type === 'mostlikely') {
     body = (
       <PlayerVote
@@ -189,13 +229,14 @@ export function QuestionScreen({ state, onSubmit }: Props) {
       />
     )
   } else {
+    const options = q.options ?? []
     body = (
       <OptionPad
-        options={q.options ?? []}
-        selected={selectedIndex}
+        options={order ? order.map((i) => options[i]) : options}
+        selected={view(selectedIndex)}
         disabled={locked}
-        disabledIndex={ownIndex !== null && ownIndex >= 0 ? ownIndex : null}
-        onPick={(optionIndex) => submit({ optionIndex })}
+        disabledIndex={ownIndex !== null && ownIndex >= 0 ? view(ownIndex) : null}
+        onPick={(i) => submit({ optionIndex: order ? order[i] : i })}
       />
     )
   }
@@ -206,7 +247,7 @@ export function QuestionScreen({ state, onSubmit }: Props) {
     : note
       ? note
       : done
-        ? phase === 'write' ? 'Fake submitted.' : phase === 'wager' ? 'Bet placed. You can change it until time runs out.' : q.type === 'sync' && (amSpot || phase === 'pick') ? null : 'Locked in.'
+        ? phase === 'write' ? 'Fake submitted.' : phase === 'wager' ? 'Bet placed. You can change it until time runs out.' : (q.type === 'sync' && (amSpot || phase === 'pick')) || q.type === 'sketch' ? null : 'Locked in.'
         : timeUp
           ? 'Time is up.'
           : null
@@ -222,7 +263,11 @@ export function QuestionScreen({ state, onSubmit }: Props) {
               {round.round_number} / {game.total_questions} · {phase === 'wager' ? 'Final Wager' : isVote ? 'Find the real answer' : type.short}
             </span>
           </div>
-          <SoundToggle />
+          <div className="flex items-center gap-2">
+            {fx?.doubled && <span className="rounded-full bg-accent-soft text-accent-ink border border-accent-line px-2 py-0.5 text-xs">✌️ Double Down</span>}
+            {jumbled && <span className="text-xs text-stone-400">🔀</span>}
+            <SoundToggle />
+          </div>
         </header>
 
         <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} ticking={!done} />
@@ -233,13 +278,22 @@ export function QuestionScreen({ state, onSubmit }: Props) {
               ? `Last question: ${q.category === 'party' ? type.label : cat.label}. How much will you bet?`
               : phase === 'pick' && amSpot
                 ? q.self
-                : q.question}
+                : q.type === 'sketch' && amSpot
+                  ? 'Your turn to draw'
+                  : q.question}
           </h2>
           <PromptExtras question={q} startsAt={round.starts_at} endsAt={round.ends_at} />
         </div>
 
-        <div className={cn('flex-1 transition-opacity duration-300', armed ? 'opacity-100' : 'opacity-40 pointer-events-none')} aria-busy={!armed}>
-          {body}
+        <div className={cn('relative flex-1 transition-opacity duration-300', armed ? 'opacity-100' : 'opacity-40 pointer-events-none')} aria-busy={!armed}>
+          <div className={cn('transition-[filter] duration-300', frozen && 'blur-sm pointer-events-none select-none')}>{body}</div>
+          {frozen && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-sky-50/80 text-sky-900 animate-fade-up">
+              <span className="text-4xl">❄️</span>
+              <p className="text-base font-medium">Frozen</p>
+              <p className="text-sm tabular-nums">{Math.ceil((frozenUntil - now) / 1000)}</p>
+            </div>
+          )}
         </div>
 
         <footer className="text-center space-y-1 min-h-[2.5rem]" aria-live="polite">
@@ -250,8 +304,8 @@ export function QuestionScreen({ state, onSubmit }: Props) {
           )}
           {phase !== 'pick' && (
             <p className="text-xs text-stone-400">
-              {state.answeredCount} of {q.type === 'sync' ? Math.max(1, totalPlayers - 1) : totalPlayers}{' '}
-              {phase === 'write' ? 'written' : phase === 'wager' ? 'bets in' : 'answered'}
+              {state.answeredCount} of {q.type === 'sync' || q.type === 'sketch' ? Math.max(1, totalPlayers - 1) : totalPlayers}{' '}
+              {phase === 'write' ? 'written' : phase === 'wager' ? 'bets in' : q.type === 'sketch' ? 'got it' : 'answered'}
             </p>
           )}
         </footer>

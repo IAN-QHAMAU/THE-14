@@ -19,6 +19,33 @@ export const STREAK_BONUS = 50
 export const FOOL_POINTS = 75
 /** Points the Sync player earns for each friend who reads them right. */
 export const READ_POINTS = 50
+/** Sketch: the artist earns this for each player who guesses the word. */
+export const DRAW_POINTS = 40
+
+/** Sketch: whether a guess matches the word or one of its alternates. */
+export function sketchMatch(guess: string, word: string, alts: string[] = []) {
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const g = key(guess)
+  return Boolean(g) && [word, ...alts].some((w) => key(w) === g)
+}
+
+/** Sketch: a guess one letter away from the word, for a gentle nudge. */
+export function sketchClose(guess: string, word: string) {
+  const a = guess.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const b = word.toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (!a || Math.abs(a.length - b.length) > 1) return false
+  let i = 0
+  let j = 0
+  let edits = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue }
+    if (++edits > 1) return false
+    if (a.length > b.length) i++
+    else if (a.length < b.length) j++
+    else { i++; j++ }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1
+}
 
 /** Final Wager: bet up to half your points, and at least 200 so everyone can play. */
 export function maxWager(score: number) {
@@ -66,6 +93,11 @@ export interface PlayerResult {
   first?: boolean
   /** Sync: how many friends guessed your answer. */
   readBy?: number
+  /** Sketch: how many players guessed your drawing. */
+  guessedBy?: number
+  /** Power-ups: you went Double Down, or earned a card with this answer. */
+  doubled?: boolean
+  earned?: 'freeze' | 'steal' | 'shuffle' | 'shield' | 'double'
 }
 
 export interface AnswerStat {
@@ -93,6 +125,10 @@ export interface RevealPayload {
   first_player_id?: string
   /** Sync: who went first, and how many guessed them right. */
   sync_id?: string
+  /** Sketch: the word, the artist and who guessed it, fastest first. */
+  word?: string
+  artist_id?: string
+  guessers?: string[]
   /** Final Wager: this was the bet round. */
   wager?: boolean
   results: Record<string, PlayerResult>
@@ -296,6 +332,20 @@ export function gradeRound(input: {
         graded.set(a.player_id, { correct: right, points: right ? q.points : 0 })
       }
       graded.set(spotId, { correct: null, points: readBy * READ_POINTS, extra: { readBy } })
+      break
+    }
+
+    case 'sketch': {
+      // Only right guesses are ever stored. Earlier guesses score more.
+      const artist = data.sync?.id
+      reveal.word = q.word
+      reveal.artist_id = artist
+      const right = answers.filter((a) => a.player_id !== artist).sort(byTime)
+      reveal.guessers = right.map((a) => a.player_id)
+      right.forEach((a, rank) => {
+        graded.set(a.player_id, { correct: true, points: Math.max(50, q.points - rank * 30) })
+      })
+      if (artist) graded.set(artist, { correct: null, points: right.length * DRAW_POINTS, extra: { guessedBy: right.length } })
       break
     }
 

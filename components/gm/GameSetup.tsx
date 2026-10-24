@@ -49,7 +49,7 @@ const PRESETS: { id: string; title: string; blurb: string; settings: GameSetting
     blurb: 'Quiz mixed with party rounds, then a Final Wager.',
     settings: {
       categories: ['movies', 'music', 'internet', 'afromusic', 'hiphop', 'series', 'football', 'kenya', 'food', 'throwback'],
-      types: ['choice', 'emoji', 'oddone', 'fastest', 'bluff', 'mostlikely', 'sync'],
+      types: ['choice', 'emoji', 'oddone', 'fastest', 'bluff', 'mostlikely', 'sync', 'sketch'],
       timer: 20,
       questionCount: 15,
       difficulty: 'mixed',
@@ -80,12 +80,39 @@ type Step = (typeof STEPS)[number]
 /** One line that sums up the game, shown next to the Start button. */
 export function setupSummary(settings: GameSettings, count: number) {
   const level = DIFFICULTY_SETTINGS.find((d) => d.id === (settings.difficulty ?? 'mixed'))?.label ?? 'Mixed'
-  return [`${count} questions`, level, `${settings.timer}s`, settings.finalWager ? 'Final Wager' : null].filter(Boolean).join(' · ')
+  return [
+    `${count} questions`,
+    level,
+    `${settings.timer}s`,
+    settings.finalWager ? 'Final Wager' : null,
+    settings.teams ? 'Teams' : null,
+    settings.powerUps ? 'Power-ups' : null,
+  ].filter(Boolean).join(' · ')
 }
 
 interface Props {
   settings: GameSettings
   onChange: (s: GameSettings) => void
+}
+
+/** A switch card for the extras. */
+function Toggle({ on, onClick, title, text }: { on: boolean; onClick: () => void; title: string; text: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn('w-full rounded-2xl border p-4 text-left transition-colors', on ? 'border-accent-line bg-accent-soft' : 'border-stone-800 bg-stone-800/40 hover:border-stone-600')}
+    >
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-base text-stone-100">{title}</span>
+        <span className={cn('w-9 h-5 rounded-full relative transition-colors flex-shrink-0', on ? 'bg-accent' : 'bg-stone-700')}>
+          <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all', on ? 'left-[18px]' : 'left-0.5')} />
+        </span>
+      </span>
+      <span className="block mt-1 text-sm text-stone-400">{text}</span>
+    </button>
+  )
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -378,25 +405,27 @@ export function GameSetup({ settings, onChange }: Props) {
             <p className="text-xs text-stone-500">Order, Closest and Bluff rounds get a little extra.</p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => set({ finalWager: !settings.finalWager })}
-            aria-pressed={settings.finalWager === true}
-            className={cn(
-              'w-full rounded-2xl border p-4 text-left transition-colors',
-              settings.finalWager ? 'border-accent-line bg-accent-soft' : 'border-stone-800 bg-stone-800/40 hover:border-stone-600',
-            )}
-          >
-            <span className="flex items-center justify-between gap-3">
-              <span className="text-base text-stone-100">Final Wager</span>
-              <span className={cn('w-9 h-5 rounded-full relative transition-colors flex-shrink-0', settings.finalWager ? 'bg-accent' : 'bg-stone-700')}>
-                <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all', settings.finalWager ? 'left-[18px]' : 'left-0.5')} />
-              </span>
-            </span>
-            <span className="block mt-1 text-sm text-stone-400">
-              The last question is a bet. Everyone stakes up to half their points before seeing it.
-            </span>
-          </button>
+          <div className="space-y-2">
+            <Label>Extras</Label>
+            <Toggle
+              on={settings.finalWager === true}
+              onClick={() => set({ finalWager: !settings.finalWager })}
+              title="Final Wager"
+              text="The last question is a bet. Everyone stakes up to half their points before seeing it."
+            />
+            <Toggle
+              on={settings.teams === true}
+              onClick={() => set({ teams: !settings.teams })}
+              title="Team Battle"
+              text="Players pick Team Amber or Team Teal in the lobby. The team with the higher average wins."
+            />
+            <Toggle
+              on={settings.powerUps === true}
+              onClick={() => set({ powerUps: !settings.powerUps })}
+              title="Power-ups"
+              text="Three right in a row earns a card: Freeze, Steal, Shuffle, Shield or Double Down."
+            />
+          </div>
         </section>
       )}
 

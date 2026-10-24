@@ -11,6 +11,7 @@ import { FUN_QUESTIONS, FUN_TRUE_FALSE, FUN_EMOJI } from './fun'
 import { MORE_WOULD_RATHER, MORE_MOST_LIKELY, MORE_BLUFF } from './party'
 import { ODD_ONE_PICS, type PicOddOne } from './oddonePics'
 import { SYNC } from './sync'
+import { SKETCH } from './sketch'
 import { TRUE_FALSE, EMOJI, PICTURE, CLOSEST, ORDER, MOST_LIKELY, BLUFF } from './special'
 import {
   CATEGORIES,
@@ -75,6 +76,7 @@ export const ALL_QUESTIONS: Question[] = [
   ...MORE_BLUFF,
   ...ODD_ONE_PICS.map(oddOne),
   ...SYNC,
+  ...SKETCH,
   ...TRUE_FALSE,
   ...EMOJI,
   ...PICTURE,
@@ -268,6 +270,7 @@ export const GET_READY_MS = 3500
 export function answerWindowSeconds(type: QuestionType, timer: number, phase: RoundData['phase'] = 'vote') {
   if (type === 'bluff' && phase === 'write') return Math.max(timer, 30) + 10
   if (phase === 'wager') return 20
+  if (type === 'sketch') return Math.max(timer, 30) + 15
   if (phase === 'pick') return timer + 5
   if (type === 'order') return timer + 10
   if (type === 'closest') return timer + 5
@@ -296,6 +299,11 @@ export function toPublicQuestion(q: Question, roundData?: RoundData): PublicQues
     case 'sync': {
       const name = roundData?.sync?.name ?? 'someone'
       return { ...base, question: q.question.replace('{name}', name), self: q.self, options: roundData?.options ?? q.options }
+    }
+    case 'sketch': {
+      // Viewers see the shape of the word, never the word.
+      const name = roundData?.sync?.name ?? 'Someone'
+      return { ...base, question: `What is ${name} drawing?`, hint: q.word.replace(/[A-Za-z]/g, '_') }
     }
     case 'emoji':
       return { ...base, options: q.options, emoji: q.emoji }

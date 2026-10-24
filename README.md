@@ -61,6 +61,9 @@ Open [http://localhost:3000](http://localhost:3000)
 **No duplicate players:** joining again from the same phone gives you your own seat back. Joining with the name of a player who has gone quiet takes that seat back with its score, which also lets people rejoin a game in progress. If that name belongs to someone still active, the joiner is asked to add an initial. Phones check in quietly in the background; players who stop checking in show as faded "away", do not hold up auto reveal and are left out of Most Likely To. The host can remove anyone with the × in the players list.
 
 ### Players
+
+New players can read the player manual at `/manual` (linked from the join page). It lives in `public/manual.html`.
+
 1. Go to `/join` on their phone
 2. Enter the game code and a name, then build an avatar (7 styles, colours, endless looks). Characters react during the game: they smile when you are right, sulk when you are wrong, sway gently in the lobby and cheer or droop as the standings move.
 3. Wait in the lobby until the GM starts
@@ -87,12 +90,17 @@ Open [http://localhost:3000](http://localhost:3000)
 | Bluff | Party mode. Everyone writes a fake answer, then tries to find the real one. Points for every player your fake fools. |
 | Would You Rather | Party mode. Pick one of two options. Side with the room to score. Worth half points, since it is a matter of taste. |
 | Sync | Party mode. How in sync is the room? Try it and see. |
+| Sketch | Party mode. One player draws a secret word on their phone while it appears live on the big screen. Everyone else types guesses: earlier right guesses score more, and the artist earns 40 for each player who gets it. |
 
 Typed answers (Bluff fakes, Sync answers) are shown in one house style: a capital first letter, no full stop at the end and shouting calmed down, so nobody can spot an answer by how it was typed.
 
 Party rounds are capped at about one in six questions and never open the game.
 
 **Final Wager:** a switch in setup. The last question becomes a bet: everyone stakes up to half their points (at least 200) before seeing it, then wins or loses the bet. Bets can be changed until the betting time runs out. Scores never drop below zero.
+
+**Team Battle:** a switch in setup. Players tap Team Amber or Team Teal in the lobby and can switch until the start; anyone who has not picked joins the smaller team. Teams are ranked by average points per player, shown on the standings, and the podium names the winning team.
+
+**Power-ups:** a switch in setup. Every 3 right answers in a row earns a random card (you hold one at a time), played between questions for the next question: Freeze (the target waits 5 seconds before answering), Steal (take 50 points from the player just above you), Shuffle (the target's answer buttons keep jumping), Shield (blocks the next card played on you) and Double Down (right counts double, wrong costs 100). Every play shows up on the big screen and on phones.
 
 ---
 
@@ -108,7 +116,7 @@ Party rounds are capped at about one in six questions and never open the game.
 | **Kenya & Africa** | 🇰🇪 Kenya (37), 🌍 Africa (44) |
 | **Lifestyle** | 🍕 Food & Drinks (33), 🚗 Cars (30), 🐘 Animals (33), 🏷️ Brands & Logos (29), 💰 Money & Business (31), 👗 Fashion (30), 🌊 Ocean & Nature (27) |
 
-Plus 90 Most Likely To prompts, 51 Bluff prompts and 70 Would You Rather prompts that work with any category. Odd One Out has 80 picture puzzles and Sync has 36 prompts.
+Plus 90 Most Likely To prompts, 51 Bluff prompts and 70 Would You Rather prompts that work with any category. Odd One Out has 80 picture puzzles, Sync has 36 prompts and Sketch has 70 words.
 
 ### Difficulty
 

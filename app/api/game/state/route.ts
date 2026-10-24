@@ -10,8 +10,11 @@ import {
   getLatestReveal,
   getGameEnd,
   getGameEvents,
+  getEventsOfTypes,
   toScoreEntries,
 } from '@/lib/db/queries'
+import { teamsFromEvents } from '@/lib/game/teams'
+import { powerLine, powerState } from '@/lib/game/powers'
 import { getQuestionById, phaseAction, toPublicQuestion } from '@/lib/game/questions'
 import { createServerSupabase } from '@/lib/db/supabase'
 import { HEARTBEAT_MS, isActive } from '@/lib/presence'
@@ -97,6 +100,16 @@ export async function GET() {
 
   const events = isGameMaster ? await getGameEvents(gameId, 20) : []
 
+  // Team Battle and Power-ups, read from the event log.
+  const extras = game.settings?.teams || game.settings?.powerUps
+    ? await getEventsOfTypes(gameId, ['team_pick', 'power_earned', 'power_played'])
+    : []
+  const teams = game.settings?.teams ? teamsFromEvents(extras.filter((e) => e.event_type === 'team_pick')) : {}
+  const powerEvents = extras.filter((e) => e.event_type !== 'team_pick')
+  const power = game.settings?.powerUps ? powerState(powerEvents) : null
+  const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? 'Someone'
+  const fx = power && round ? power.effects[round.round_number] : undefined
+
   const response: GameStateResponse = {
     serverStart,
     serverNow: Date.now(),
@@ -112,6 +125,17 @@ export async function GET() {
     // A written answer counts as picked too (-1: not one of the options).
     myPick: mine.pick?.option_index ?? (mine.pick?.text ? -1 : null),
     myPickText: mine.pick?.text ?? null,
+    // Sketch: only the artist sees the word while the round is live.
+    myWord:
+      question?.type === 'sketch' && round?.data?.sync?.id === playerId && game.status === 'active'
+        ? question.word
+        : null,
+    teams,
+    myCard: power && !isGameMaster ? power.held[playerId] ?? null : null,
+    myEffects: fx && !isGameMaster
+      ? { frozen: fx.frozen.includes(playerId), shuffled: fx.shuffled.includes(playerId), doubled: fx.doubled.includes(playerId) }
+      : null,
+    powerFeed: powerEvents.slice(-6).map((e) => ({ id: e.id, text: powerLine(e, nameOf), at: e.created_at })).filter((e) => e.text),
     submissionStatus,
     answeredCount,
     reveal,

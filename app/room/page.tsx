@@ -9,6 +9,8 @@ import { QuestionResult } from '@/components/game/QuestionResult'
 import { Standings } from '@/components/game/Standings'
 import { Podium } from '@/components/game/Podium'
 import { ShareCard } from '@/components/game/ShareCard'
+import { TeamBanner, TeamBar } from '@/components/game/Teams'
+import { PowerHand, PowerToast } from '@/components/game/Powers'
 import { ReactionBar, ReactionLayer, useReactions } from '@/components/game/Reactions'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { VoiceFab } from '@/components/voice/Voice'
@@ -84,7 +86,7 @@ export default function RoomPage() {
     const { game, myPlayer } = state
 
     if (game.status === 'waiting') {
-      return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} />
+      return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} teams={state.teams} />
     }
 
     // The host closed this lobby before it started (usually for a new game).
@@ -113,6 +115,7 @@ export default function RoomPage() {
           <ReactionLayer items={items} />
           <Podium scores={state.scores} awards={state.awards} tags={state.tags} myPlayerId={myPlayer?.id}>
             <div className="space-y-6">
+              {game.settings?.teams && <TeamBanner scores={state.scores} teams={state.teams} />}
               <ReactionBar onSend={send} dark />
               {meEntry && (
                 <ShareCard mode="player" me={meEntry} scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
@@ -140,12 +143,14 @@ export default function RoomPage() {
         <Dark>
           <ReactionLayer items={items} />
           <div className="space-y-8">
+            {game.settings?.teams && <TeamBar scores={state.scores} teams={state.teams} />}
             <Standings
               scores={state.scores}
               lastReveal={state.lastReveal}
               myPlayerId={myPlayer?.id}
               subtitle={`After question ${game.current_round} of ${game.total_questions}`}
             />
+            <PowerHand state={state} dark />
             <ReactionBar onSend={send} dark />
           </div>
         </Dark>
@@ -162,7 +167,10 @@ export default function RoomPage() {
     if (game.status === 'category') {
       return (
         <Dark>
-          <GameIntro game={game} />
+          <div className="space-y-8">
+            <GameIntro game={game} />
+            <PowerHand state={state} dark />
+          </div>
         </Dark>
       )
     }
@@ -184,6 +192,7 @@ export default function RoomPage() {
       callLink={state.game.settings?.callLink}
     >
       {screen()}
+      {state.game.settings?.powerUps && <PowerToast feed={state.powerFeed} />}
       <VoiceFab />
     </VoiceProvider>
   )

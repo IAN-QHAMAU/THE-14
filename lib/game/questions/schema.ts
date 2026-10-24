@@ -13,6 +13,7 @@ export type QuestionType =
   | 'oddone'
   | 'fastest'
   | 'sync'
+  | 'sketch'
 
 export type Category =
   // Brain
@@ -138,6 +139,14 @@ export interface SyncQuestion extends BaseQuestion {
   options: string[]
 }
 
+/** Sketch: one player draws the word, everyone else guesses it. */
+export interface SketchQuestion extends BaseQuestion {
+  type: 'sketch'
+  word: string
+  /** Other guesses that also count. */
+  alts?: string[]
+}
+
 export interface WouldRatherQuestion extends BaseQuestion {
   type: 'wouldrather'
   /** Exactly two choices. */
@@ -149,6 +158,7 @@ export type Question =
   | OddOneQuestion
   | FastestQuestion
   | SyncQuestion
+  | SketchQuestion
   | ChoiceQuestion
   | EmojiQuestion
   | PictureQuestion
@@ -165,7 +175,7 @@ export const OPTION_TYPES: QuestionType[] = ['choice', 'truefalse', 'emoji', 'pi
 
 /** Types where a right answer exists and streaks count. */
 export function isGradedType(type: QuestionType) {
-  return type !== 'mostlikely' && type !== 'wouldrather' && type !== 'sync'
+  return type !== 'mostlikely' && type !== 'wouldrather' && type !== 'sync' && type !== 'sketch'
 }
 
 // ─── Categories ────────────────────────────────────────────────────────────
@@ -277,6 +287,7 @@ export const GAME_TYPES: Record<QuestionType, GameTypeInfo> = {
   bluff:      { label: 'Bluff',              short: 'Write a fake',      description: 'Write a fake answer, then find the real one.', party: true },
   wouldrather: { label: 'Would You Rather', short: 'Pick a side',       description: 'Two choices. Side with the room to score.', party: true },
   sync:       { label: 'Sync',               short: 'Are you in sync?',  description: 'How in sync is the room? You will see.', party: true },
+  sketch:     { label: 'Sketch',             short: 'Draw and guess',    description: 'One player draws a secret word. Everyone else races to guess it.', party: true },
 }
 
 export const ALL_TYPES = Object.keys(GAME_TYPES) as QuestionType[]
@@ -295,6 +306,10 @@ export interface GameSettings {
   callLink?: string
   /** The last question becomes a bet. */
   finalWager?: boolean
+  /** Players pick one of two teams in the lobby. */
+  teams?: boolean
+  /** Streaks earn cards like Freeze and Steal. */
+  powerUps?: boolean
 }
 
 export const TIMER_OPTIONS = [10, 20, 30]
@@ -338,7 +353,7 @@ export interface RoundData {
   options?: string[]
   /** The last question of a Final Wager game. */
   wager?: boolean
-  /** sync: the player who goes first */
+  /** sync: the player who goes first. sketch: the artist. */
   sync?: { id: string; name: string; avatar: string }
 }
 

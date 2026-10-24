@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
       allowedOrigins: ['localhost:3000'],
     },
   },
+  async rewrites() {
+    // The player manual is a static page in public/manual.html.
+    return [{ source: '/manual', destination: '/manual.html' }]
+  },
   async headers() {
     return [
       {

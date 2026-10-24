@@ -2,6 +2,7 @@
 
 import { AvatarDisplay } from '@/components/ui/Avatar'
 import { PictureFrame } from '@/components/game/answers'
+import { SketchShot } from '@/components/game/Sketch'
 import { cn } from '@/lib/utils'
 import type { Player, PublicQuestion, RevealPayload } from '@/types'
 
@@ -59,6 +60,46 @@ export function RevealBoard({ reveal, question, players, myPlayerId, myChoice, s
           })}
         </ol>
         {!reveal.guesses?.length && <p className={cn('text-sm text-center', muted)}>No guesses this time.</p>}
+      </div>
+    )
+  }
+
+  // ── Sketch ──────────────────────────────────────────────────────────────
+  if (reveal.type === 'sketch') {
+    const artist = reveal.artist_id ? byId.get(reveal.artist_id) : undefined
+    const guessers = reveal.guessers ?? []
+    return (
+      <div className="space-y-5">
+        <div className={cn('grid gap-5 items-center', stage ? 'grid-cols-[minmax(0,18rem)_1fr]' : 'grid-cols-[7rem_1fr]')}>
+          <SketchShot />
+          <div className="space-y-1">
+            <p className={cn('text-xs uppercase tracking-widest', muted)}>The word</p>
+            <p className={cn('font-light', strong, stage ? 'text-6xl' : 'text-3xl')}>{reveal.word}</p>
+            {artist && <p className={cn('text-sm', muted)}>Drawn by {artist.name}</p>}
+          </div>
+        </div>
+        {guessers.length ? (
+          <ol className="space-y-1.5">
+            {guessers.slice(0, stage ? 8 : 6).map((id, i) => {
+              const p = byId.get(id)
+              const r = reveal.results[id]
+              return (
+                <li
+                  key={id}
+                  className={cn('flex items-center gap-3 rounded-xl px-3 py-2 animate-fade-up', id === myPlayerId ? (dark ? 'bg-stone-700' : 'bg-stone-200') : track)}
+                  style={{ animationDelay: `${i * 80}ms` }}
+                >
+                  <span className={cn('w-5 text-xs font-mono', muted)}>{i + 1}</span>
+                  {p && <AvatarDisplay avatarId={p.avatar} size="xs" />}
+                  <span className={cn('flex-1 truncate text-sm', strong)}>{p?.name ?? 'Player'}</span>
+                  <span className={cn('font-mono text-sm tabular-nums', strong)}>+{r?.points ?? 0}</span>
+                </li>
+              )
+            })}
+          </ol>
+        ) : (
+          <p className={cn('text-sm', muted)}>Nobody got it this time.</p>
+        )}
       </div>
     )
   }

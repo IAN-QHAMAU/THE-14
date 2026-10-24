@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { createServerSupabase } from '@/lib/db/supabase'
-import { getCurrentRound, getMyActions } from '@/lib/db/queries'
+import { getCurrentRound, getEventsOfTypes, getGameById, getMyActions } from '@/lib/db/queries'
+import { FREEZE_MS, powerState } from '@/lib/game/powers'
 import { getQuestionById, OPTION_TYPES } from '@/lib/game/questions'
-import { TOO_FAST_MS, maxWager, normalizeText, tidyAnswer, type AnswerPayload } from '@/lib/game/scoring'
+import { TOO_FAST_MS, maxWager, normalizeText, sketchClose, sketchMatch, tidyAnswer, type AnswerPayload } from '@/lib/game/scoring'
 import type { ActionType } from '@/types'
 
 /** Small allowance for network lag after the timer hits zero. */
@@ -33,6 +34,13 @@ export async function POST(req: NextRequest) {
   if (now < startsAt - 250) return fail('Not yet. Wait for it.')
   if (now > endsAt + LATE_GRACE_MS) return fail('Time is up.')
 
+  // Power-ups: a frozen player has to wait out the freeze.
+  const game = await getGameById(gameId)
+  if (game?.settings?.powerUps && now < startsAt + FREEZE_MS) {
+    const { effects } = powerState(await getEventsOfTypes(gameId, ['power_earned', 'power_played']))
+    if (effects[round.round_number]?.frozen.includes(playerId)) return fail('Frozen. Hold on a moment.')
+  }
+
   const timeTakenMs = Math.max(0, now - startsAt)
   const payload: AnswerPayload = { answered_at: new Date(now).toISOString(), time_taken_ms: timeTakenMs }
   let actionType: ActionType = 'answer'
@@ -56,6 +64,15 @@ export async function POST(req: NextRequest) {
     payload.text = text
   } else if (question.type === 'sync' && data.phase === 'vote' && playerId === spot) {
     return fail('Sit back. They are guessing about you.')
+  } else if (question.type === 'sketch') {
+    // Sketch: only a right guess is saved. Wrong ones just bounce back.
+    if (playerId === spot) return fail('You are the artist. Keep drawing.')
+    const text = String(body.text ?? '').trim().slice(0, 40)
+    if (!text) return fail('Type a guess first.')
+    if (!sketchMatch(text, question.word, question.alts)) {
+      return NextResponse.json({ success: false, wrong: true, close: sketchClose(text, question.word) })
+    }
+    payload.text = question.word
   } else if (question.type === 'bluff' && round.status === 'active') {
     const text = String(body.text ?? '').trim().slice(0, 60)
     if (!text) return fail('Write something first.')

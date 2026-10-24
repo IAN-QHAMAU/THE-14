@@ -8,7 +8,10 @@ import { RevealBoard } from '@/components/game/RevealBoard'
 import { Standings } from '@/components/game/Standings'
 import { Podium } from '@/components/game/Podium'
 import { ShareCard } from '@/components/game/ShareCard'
+import { TeamBanner, TeamBar } from '@/components/game/Teams'
+import { TEAMS, TEAM_IDS } from '@/lib/game/teams'
 import { PromptExtras } from '@/components/game/answers'
+import { SketchStage } from '@/components/game/Sketch'
 import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
 import { useEffect, useState } from 'react'
 import { useServerNow } from '@/lib/clock'
@@ -47,6 +50,16 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
             <span className="text-stone-400">
               <span className="text-stone-100 font-medium">{players.length}</span> of {seats} joined
             </span>
+            {game.settings?.teams && (
+              <span className="hidden sm:flex items-center gap-3 text-stone-400">
+                {TEAM_IDS.map((id) => (
+                  <span key={id} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TEAMS[id].colour }} />
+                    {players.filter((p) => state.teams[p.id] === id).length}
+                  </span>
+                ))}
+              </span>
+            )}
             <span className={cn('transition-colors', here >= 2 ? 'text-accent' : 'text-stone-500')}>
               {here === 0 ? 'Waiting for the first player' : here === 1 ? 'One more and you can start' : 'Ready when you are'}
             </span>
@@ -64,13 +77,15 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
               }
               return (
                 <div key={p.id} className="flex flex-col items-center gap-1.5 min-w-0 animate-seat-in">
-                  <AvatarDisplay
-                    avatarId={p.avatar}
-                    size={size === 'stage' ? 'lg' : 'md'}
-                    idle={p.is_connected}
-                    style={{ animationDelay: `${-i * 0.9}s` }}
-                    className={cn(!p.is_connected && 'opacity-40')}
-                  />
+                  <span className="rounded-full p-[3px]" style={state.teams[p.id] ? { boxShadow: `0 0 0 3px ${TEAMS[state.teams[p.id]].colour}` } : undefined}>
+                    <AvatarDisplay
+                      avatarId={p.avatar}
+                      size={size === 'stage' ? 'lg' : 'md'}
+                      idle={p.is_connected}
+                      style={{ animationDelay: `${-i * 0.9}s` }}
+                      className={cn(!p.is_connected && 'opacity-40')}
+                    />
+                  </span>
                   <span className={cn('text-sm truncate max-w-full', p.is_connected ? 'text-stone-200' : 'text-stone-500')}>{p.name}</span>
                 </div>
               )
@@ -86,6 +101,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
   if (game.status === 'leaderboard') {
     return (
       <div className="w-full max-w-3xl mx-auto">
+        {game.settings?.teams && <div className="mb-6"><TeamBar scores={state.scores} teams={state.teams} size={size} /></div>}
         <Standings
           scores={state.scores}
           lastReveal={state.lastReveal}
@@ -100,6 +116,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
   if (game.status === 'finished') {
     return (
       <Podium scores={state.scores} awards={state.awards} tags={state.tags} size={size}>
+        {game.settings?.teams && <TeamBanner scores={state.scores} teams={state.teams} size={size} />}
         <div className="max-w-xs mx-auto w-full space-y-2">
           <p className="text-xs tracking-widest uppercase text-stone-500 text-center">Group results card</p>
           <ShareCard mode="group" scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
@@ -124,6 +141,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
     : isVote ? 'Voting time'
     : phase === 'pick' ? `${spot?.name ?? 'Someone'} goes first`
     : q.type === 'sync' ? 'Time to guess'
+    : q.type === 'sketch' ? `${spot?.name ?? 'Someone'} is drawing`
     : undefined
 
   // ── Reveal ───────────────────────────────────────────────────────────────
@@ -191,7 +209,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
 
       {round.starts_at && round.ends_at && <TimerBar startsAt={round.starts_at} endsAt={round.ends_at} dark ticking />}
 
-      {spot && (
+      {spot && q.type !== 'sketch' && (
         <div className="flex items-center gap-4">
           <AvatarDisplay avatarId={spot.avatar} size="xl" idle />
           <p className="text-xl text-stone-300">{spot.name} goes first</p>
@@ -210,6 +228,8 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         <p className="text-lg text-stone-400">{spot?.name ?? 'They'} is answering on their phone. Everyone else guesses next.</p>
       ) : isWrite ? (
         <p className="text-lg text-stone-400">Players are writing their fakes on their phones.</p>
+      ) : q.type === 'sketch' ? (
+        <SketchStage roundId={round.id} hint={q.hint} artist={spot?.name} size={size} />
       ) : q.type === 'oddone' ? (
         <div className="grid grid-cols-4 gap-4 max-w-3xl">
           {(q.options ?? []).map((pic, i) => (
@@ -261,7 +281,7 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
         <span className="text-sm text-stone-400">
           {phase === 'pick'
             ? `Waiting for ${spot?.name ?? 'them'}`
-            : `${state.answeredCount} of ${spot ? Math.max(1, players.length - 1) : players.length} ${isWrite ? 'written' : phase === 'wager' ? 'bets in' : 'answered'}`}
+            : `${state.answeredCount} of ${spot ? Math.max(1, players.length - 1) : players.length} ${isWrite ? 'written' : phase === 'wager' ? 'bets in' : q.type === 'sketch' ? 'got it' : 'answered'}`}
         </span>
       </div>
     </div>
