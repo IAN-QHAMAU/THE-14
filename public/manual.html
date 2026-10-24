@@ -8,7 +8,7 @@
 <body>
 <title>THE 14 Player Manual</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="How to join and play THE 14 online with friends: invite links, voice chat, points, game modes and the Final Wager.">
+<meta name="description" content="How to join and play THE 14 online with friends: invite links, voice chat, points, game modes, Team Battle, Power-ups and the Final Wager.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:ital,wdth,wght@1,50..150,100..900&family=Geist+Mono:wght@400;500&family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600&display=swap">
@@ -333,6 +333,17 @@
   .outcome b { display: block; font: 500 20px/1.25 var(--mono); font-variant-numeric: tabular-nums; }
   .bet small { font-size: 12px; color: var(--ink-3); }
 
+  /* Team Battle and Power-ups */
+  .sketch-demo { display: inline-grid; place-items: center; width: 64px; height: 44px; border-radius: 8px; background: #fff; color: #1c1917; box-shadow: inset 0 0 0 1px var(--line); }
+  .cards-head { margin-top: 32px; display: grid; gap: 6px; max-width: 62ch; }
+  .cards-head h3 { margin: 0; font: 600 20px/1.3 var(--display); letter-spacing: -0.01em; }
+  .cards-head p { margin: 0; color: var(--ink-2); }
+  .power-cards { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .pcard { padding: 16px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); display: grid; gap: 6px; align-content: start; }
+  .pcard .pe { font-size: 28px; line-height: 1; }
+  .pcard h4 { margin: 4px 0 0; font: 600 16px/1.3 var(--body); }
+  .pcard p { margin: 0; font-size: 14px; color: var(--ink-2); }
+
   /* FAQ */
   .faq details { border-top: 1px solid var(--line); }
   .faq details:last-of-type { border-bottom: 1px solid var(--line); }
@@ -368,6 +379,7 @@
         <li><a href="#points">Points</a></li>
         <li><a href="#modes">Modes</a></li>
         <li><a href="#wager">Final Wager</a></li>
+        <li><a href="#extras">Teams &amp; cards</a></li>
         <li><a href="#online">Online tips</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ol>
@@ -385,7 +397,7 @@
       <ul class="facts">
         <li><b>1,800+</b> questions</li>
         <li><b>44</b> categories</li>
-        <li><b>12</b> ways to play</li>
+        <li><b>13</b> ways to play</li>
         <li><b>14</b> players max</li>
       </ul>
     </header>
@@ -531,7 +543,7 @@
       <div class="modes-head">
         <div class="sec-head">
           <p class="kicker">Ways to play</p>
-          <h2 id="modes-title">The 12 modes</h2>
+          <h2 id="modes-title">The 13 modes</h2>
           <p class="sub">The host picks which modes are in the game. Party modes come up about once every six questions and never open a game.</p>
         </div>
         <div class="filter" role="group" aria-label="Show modes">
@@ -613,6 +625,12 @@
           <p>How well do you know each other? One player answers in secret, by picking an option or writing their own. Everyone else guesses what they said.</p>
           <p class="score"><b>100</b> for a right guess. The player in the spotlight gets <b>50</b> for each friend who reads them right.</p>
         </article>
+        <article class="mode" data-kind="party">
+          <header><h3>Sketch</h3><span class="tag">Party</span></header>
+          <div class="demo" aria-hidden="true"><span class="sketch-demo"><svg viewBox="0 0 60 40" width="60" height="40"><path d="M8 32 Q20 6 30 20 T52 10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="46" cy="28" r="5" fill="none" stroke="var(--amber)" stroke-width="3"/></svg></span><span class="pill">_ _ _ _ _</span></div>
+          <p>One player gets a secret word and draws it on their phone. The drawing appears live on every phone, so it works just as well when you are all in different places. Everyone else types guesses as fast as they can. Wrong guesses scroll past for all to laugh at, and a near miss gets a "So close".</p>
+          <p class="score"><b>200</b> for the first right guess, then 30 less for each one after, down to <b>50</b>. The artist gets <b>40</b> for each player who gets it.</p>
+        </article>
       </div>
     </section>
 
@@ -645,6 +663,30 @@
           </div>
           <small>"If right" counts a 150 point question with no bonus.</small>
         </div>
+      </div>
+    </section>
+
+    <!-- Team Battle and Power-ups -->
+    <section class="sec" id="extras" aria-labelledby="extras-title">
+      <div class="sec-head">
+        <p class="kicker">Switches the host can turn on</p>
+        <h2 id="extras-title">Team Battle and Power-ups</h2>
+        <p class="sub">Two extras that change how a game feels. Use one, both or neither.</p>
+      </div>
+      <div class="grid2">
+        <div class="item"><h3>Team Battle</h3><p>In the lobby, tap <b>Team Amber</b> or <b>Team Teal</b>. You can switch sides until the game starts, and anyone who has not picked joins the smaller team.</p></div>
+        <div class="item"><h3>How teams win</h3><p>Teams are ranked by <b>average</b> points per player, so a smaller team is never at a disadvantage. A team bar shows on the standings and the podium names the winning team.</p></div>
+      </div>
+      <div class="cards-head">
+        <h3>Power-ups</h3>
+        <p>Get <b>three right in a row</b> and you earn a random card. You hold one at a time. Play it from your phone between questions and it works on the next question. Every card played pops up on everyone's screen.</p>
+      </div>
+      <div class="power-cards">
+        <div class="pcard"><span class="pe" aria-hidden="true">❄️</span><h4>Freeze</h4><p>Pick a player. Their answers stay locked for the first 5 seconds.</p></div>
+        <div class="pcard"><span class="pe" aria-hidden="true">🫳</span><h4>Steal</h4><p>Take 50 points from the player just above you. In the lead? You take from second place.</p></div>
+        <div class="pcard"><span class="pe" aria-hidden="true">🔀</span><h4>Shuffle</h4><p>Pick a player. Their answer buttons keep jumping around.</p></div>
+        <div class="pcard"><span class="pe" aria-hidden="true">🛡️</span><h4>Shield</h4><p>Nothing to tap. It blocks the next card anyone plays on you.</p></div>
+        <div class="pcard"><span class="pe" aria-hidden="true">✌️</span><h4>Double Down</h4><p>A bet on yourself. Right answer counts double, wrong costs 100.</p></div>
       </div>
     </section>
 
@@ -681,7 +723,7 @@
       </details>
       <details>
         <summary>Can I change my answer?</summary>
-        <div><p>No. Your first answer is final, so be sure before you tap. The one exception is your Final Wager bet, which you can change until betting closes.</p></div>
+        <div><p>No. Your first answer is final, so be sure before you tap. The exceptions are your Final Wager bet, which you can change until betting closes, and Sketch, where you can keep guessing until you get it.</p></div>
       </details>
       <details>
         <summary>Why did someone get more points for the same answer?</summary>
@@ -694,6 +736,14 @@
       <details>
         <summary>What happens if I do not answer?</summary>
         <div><p>You get no points for that question and your streak ends. In the Final Wager, no answer loses your bet, so answer something.</p></div>
+      </details>
+      <details>
+        <summary>Can we play Sketch if we are not in the same room?</summary>
+        <div><p>Yes. The drawing shows up live on every player's phone, so you do not need a shared screen. The artist's phone sends the drawing, so they should stay on a steady connection. If you reload, the drawing so far comes back.</p></div>
+      </details>
+      <details>
+        <summary>Someone froze me. Did I lose the question?</summary>
+        <div><p>No. You just have to wait out the first 5 seconds, then answer as normal. The speed bonus goes to the fastest players, though, so a freeze can cost you that.</p></div>
       </details>
       <details>
         <summary>Does the host see the answers early?</summary>
@@ -715,7 +765,7 @@
       <details id="hosting">
         <summary>How do I host a game?</summary>
         <div>
-          <p>Open <a href="/gm">the-14.vercel.app/gm</a> on a laptop or phone. Pick a ready made game like Quick Round, Party Night or Brain Battle, or build your own. Then tap <b>Share invite</b> and drop the link in your group chat.</p>
+          <p>Open <a href="/gm">the-14.vercel.app/gm</a> on a laptop or phone. Pick a ready made game like Quick Round, Party Night or Brain Battle, or build your own. Switch on Final Wager, Team Battle or Power-ups in the Rules step if you want them. Then tap <b>Share invite</b> and drop the link in your group chat.</p>
           <p>Leave <b>Auto play</b> on and the game runs itself: it reveals when everyone has answered or time runs out, shows standings every three questions, then moves on.</p>
         </div>
       </details>
