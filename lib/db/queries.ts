@@ -134,6 +134,18 @@ export function toScoreEntries(players: Player[]): PlayerScoreEntry[] {
     .sort((a, b) => b.total - a.total)
 }
 
+/** Events of some types, oldest first, with their payloads. */
+export async function getEventsOfTypes(gameId: string, types: string[]) {
+  const db = createServerSupabase()
+  const { data } = await db
+    .from('events')
+    .select('id, event_type, actor_id, target_id, payload, created_at')
+    .eq('game_id', gameId)
+    .in('event_type', types)
+    .order('created_at', { ascending: true })
+  return (data ?? []) as { id: string; event_type: string; actor_id: string | null; target_id: string | null; payload: Record<string, unknown>; created_at: string }[]
+}
+
 export async function getGameEvents(gameId: string, limit = 30): Promise<GameEvent[]> {
   const db = createServerSupabase()
   const { data } = await db

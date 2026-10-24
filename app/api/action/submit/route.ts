@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { createServerSupabase } from '@/lib/db/supabase'
-import { getCurrentRound, getMyActions } from '@/lib/db/queries'
+import { getCurrentRound, getEventsOfTypes, getGameById, getMyActions } from '@/lib/db/queries'
+import { FREEZE_MS, powerState } from '@/lib/game/powers'
 import { getQuestionById, OPTION_TYPES } from '@/lib/game/questions'
 import { TOO_FAST_MS, maxWager, normalizeText, tidyAnswer, type AnswerPayload } from '@/lib/game/scoring'
 import type { ActionType } from '@/types'
@@ -32,6 +33,13 @@ export async function POST(req: NextRequest) {
   const endsAt = round.ends_at ? Date.parse(round.ends_at) : now + 60_000
   if (now < startsAt - 250) return fail('Not yet. Wait for it.')
   if (now > endsAt + LATE_GRACE_MS) return fail('Time is up.')
+
+  // Power-ups: a frozen player has to wait out the freeze.
+  const game = await getGameById(gameId)
+  if (game?.settings?.powerUps && now < startsAt + FREEZE_MS) {
+    const { effects } = powerState(await getEventsOfTypes(gameId, ['power_earned', 'power_played']))
+    if (effects[round.round_number]?.frozen.includes(playerId)) return fail('Frozen. Hold on a moment.')
+  }
 
   const timeTakenMs = Math.max(0, now - startsAt)
   const payload: AnswerPayload = { answered_at: new Date(now).toISOString(), time_taken_ms: timeTakenMs }

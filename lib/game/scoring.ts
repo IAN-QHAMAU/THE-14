@@ -66,6 +66,9 @@ export interface PlayerResult {
   first?: boolean
   /** Sync: how many friends guessed your answer. */
   readBy?: number
+  /** Power-ups: you went Double Down, or earned a card with this answer. */
+  doubled?: boolean
+  earned?: 'freeze' | 'steal' | 'shuffle' | 'shield' | 'double'
 }
 
 export interface AnswerStat {

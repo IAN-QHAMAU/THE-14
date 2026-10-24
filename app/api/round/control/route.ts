@@ -41,7 +41,9 @@ function parseSettings(raw: unknown): GameSettings | null {
   const questionCount = Math.min(MAX_QUESTIONS, Math.max(MIN_QUESTIONS, Number(r.questionCount) || 10))
   const difficulty = DIFFICULTY_SETTINGS.some((d) => d.id === r.difficulty) ? (r.difficulty as DifficultySetting) : 'mixed'
   const finalWager = r.finalWager === true
-  return { categories: [...new Set(categories)], types: [...new Set(types)], timer, questionCount, difficulty, finalWager }
+  const teams = r.teams === true
+  const powerUps = r.powerUps === true
+  return { categories: [...new Set(categories)], types: [...new Set(types)], timer, questionCount, difficulty, finalWager, teams, powerUps }
 }
 
 export async function POST(req: NextRequest) {
@@ -122,6 +124,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Nothing to end.' }, { status: 400 })
       }
       await finishGame(gameId)
+      return NextResponse.json({ success: true })
+    }
+
+    case 'lobby_modes': {
+      // Team Battle is switched on in the lobby, before the game starts, so phones can pick a side.
+      if (game.status !== 'waiting') return NextResponse.json({ error: 'The game has started.' }, { status: 400 })
+      const next = { ...(game.settings ?? {}), teams: body.teams === true }
+      await createServerSupabase().from('games').update({ settings: next }).eq('id', gameId)
       return NextResponse.json({ success: true })
     }
 

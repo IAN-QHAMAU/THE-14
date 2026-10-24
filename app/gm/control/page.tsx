@@ -8,6 +8,7 @@ import { SoundToggle } from '@/components/ui/SoundToggle'
 import { VoiceHeaderButton, useSpeaking } from '@/components/voice/Voice'
 import { VoiceProvider } from '@/lib/voice/VoiceProvider'
 import { HostStage } from '@/components/gm/HostStage'
+import { PowerToast } from '@/components/game/Powers'
 import { DEFAULT_SETTINGS, GameSetup, poolSize, setupSummary } from '@/components/gm/GameSetup'
 import { ReactionLayer, useReactions } from '@/components/game/Reactions'
 import { serverNow, useServerNow } from '@/lib/clock'
@@ -46,6 +47,8 @@ function loadSettings(): GameSettings {
       questionCount: s.questionCount ?? 12,
       difficulty: s.difficulty ?? 'mixed',
       finalWager: s.finalWager === true,
+      teams: s.teams === true,
+      powerUps: s.powerUps === true,
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -89,6 +92,14 @@ export default function GMControlPage() {
     }
     setJoinUrl(`${window.location.host}/join`)
   }, [])
+
+  // Team Battle has to be known in the lobby so phones can show the team picker.
+  const lobbyTeams = state?.game.status === 'waiting' ? settings.teams === true : null
+  const savedTeams = state?.game.settings?.teams === true
+  useEffect(() => {
+    if (lobbyTeams === null || lobbyTeams === savedTeams) return
+    void fetch('/api/round/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'lobby_modes', teams: lobbyTeams }) })
+  }, [lobbyTeams, savedTeams])
 
   const updateSettings = (s: GameSettings) => {
     setSettings(s)
@@ -368,6 +379,7 @@ export default function GMControlPage() {
         {/* Stage */}
         <section className="min-w-0 px-4 md:px-10 py-6 md:py-12 flex flex-col items-center justify-center min-h-[50vh] lg:sticky lg:top-0 lg:h-[calc(100dvh-8.5rem)] lg:overflow-y-auto">
           <HostStage state={state} joinUrl={joinUrl} />
+          {state.game.settings?.powerUps && <PowerToast feed={state.powerFeed} />}
         </section>
 
         {/* Side panel */}

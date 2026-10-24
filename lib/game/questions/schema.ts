@@ -295,6 +295,10 @@ export interface GameSettings {
   callLink?: string
   /** The last question becomes a bet. */
   finalWager?: boolean
+  /** Players pick one of two teams in the lobby. */
+  teams?: boolean
+  /** Streaks earn cards like Freeze and Steal. */
+  powerUps?: boolean
 }
 
 export const TIMER_OPTIONS = [10, 20, 30]

@@ -1,5 +1,7 @@
 import { createServerSupabase } from '@/lib/db/supabase'
-import { getAllReveals, getRoundActions } from '@/lib/db/queries'
+import { getAllReveals, getEventsOfTypes, getRoundActions } from '@/lib/db/queries'
+import { smallerTeam, teamsFromEvents } from '@/lib/game/teams'
+import { DOUBLE_DOWN_LOSS, POWER_IDS, STREAK_FOR_CARD, powerState, type PowerCard } from '@/lib/game/powers'
 import {
   GET_READY_MS,
   answerWindowSeconds,
@@ -26,7 +28,7 @@ export async function setupGame(gameId: string, settings: GameSettings) {
 
   await client.from('rounds').delete().eq('game_id', gameId)
   await client.from('scores').delete().eq('game_id', gameId)
-  await client.from('events').delete().eq('game_id', gameId)
+  await client.from('events').delete().eq('game_id', gameId).neq('event_type', 'team_pick')
   const { error: insertError } = await client.from('rounds').insert(
     questions.map((q, i) => ({
       game_id: gameId,
@@ -47,6 +49,7 @@ export async function setupGame(gameId: string, settings: GameSettings) {
     .from('players')
     .update({ score: 0, streak: 0, best_streak: 0 })
     .eq('game_id', gameId)
+  if (settings.teams) await fillTeams(gameId)
 
   await client
     .from('games')
@@ -63,6 +66,21 @@ export async function setupGame(gameId: string, settings: GameSettings) {
 
   await logEvent(gameId, null, 'game_started', { questions: questions.length })
   return { error: null }
+}
+
+/** Team Battle: anyone who has not picked a side joins the smaller team. */
+async function fillTeams(gameId: string) {
+  const [players, picks] = await Promise.all([
+    db().from('players').select('id').eq('game_id', gameId).eq('is_game_master', false),
+    getEventsOfTypes(gameId, ['team_pick']),
+  ])
+  const ids = (players.data ?? []).map((p) => p.id as string)
+  const teams = teamsFromEvents(picks)
+  for (const id of ids) {
+    if (teams[id]) continue
+    teams[id] = smallerTeam(teams, ids)
+    await db().from('events').insert({ game_id: gameId, event_type: 'team_pick', actor_id: id, payload: { team: teams[id], auto: true } })
+  }
 }
 
 /** Questions with one clear right answer, good for a bet. */
@@ -83,7 +101,7 @@ export async function resetGame(gameId: string) {
   const client = db()
   await client.from('rounds').delete().eq('game_id', gameId)
   await client.from('scores').delete().eq('game_id', gameId)
-  await client.from('events').delete().eq('game_id', gameId)
+  await client.from('events').delete().eq('game_id', gameId).neq('event_type', 'team_pick')
   await client.from('players').update({ score: 0, streak: 0, best_streak: 0 }).eq('game_id', gameId)
   await client
     .from('games')
@@ -250,6 +268,26 @@ export async function lockAndRevealQuestion(gameId: string, round: Round) {
 
   const graded = gradeRound({ question, data: round.data ?? {}, answers, players })
 
+  // Power-ups: Double Down on this question, and new cards for streaks.
+  const { data: gameRow } = await client.from('games').select('settings').eq('id', gameId).single()
+  const earned: { id: string; card: PowerCard }[] = []
+  if ((gameRow?.settings as { powerUps?: boolean } | null)?.powerUps) {
+    const power = powerState(await getEventsOfTypes(gameId, ['power_earned', 'power_played']))
+    for (const id of power.effects[round.round_number]?.doubled ?? []) {
+      const r = graded.results[id]
+      if (!r) continue
+      r.points = r.correct ? r.points * 2 : r.points - DOUBLE_DOWN_LOSS
+      r.doubled = true
+    }
+    for (const p of players) {
+      const r = graded.results[p.id]
+      if (!r?.correct || !r.streak || r.streak % STREAK_FOR_CARD !== 0 || power.held[p.id]) continue
+      const card = POWER_IDS[Math.floor(Math.random() * POWER_IDS.length)]
+      r.earned = card
+      earned.push({ id: p.id, card })
+    }
+  }
+
   const before = Object.fromEntries(players.map((p) => [p.id, p.score]))
   // A lost bet can take points away, but never below zero.
   const after = Object.fromEntries(players.map((p) => [p.id, Math.max(0, p.score + (graded.results[p.id]?.points ?? 0))]))
@@ -284,6 +322,9 @@ export async function lockAndRevealQuestion(gameId: string, round: Round) {
   // Save the reveal before flipping the status so phones never see a reveal
   // screen without its data.
   await logEvent(gameId, round.id, 'reveal_triggered', payload as unknown as Record<string, unknown>)
+  if (earned.length) {
+    await client.from('events').insert(earned.map((e) => ({ game_id: gameId, round_id: round.id, event_type: 'power_earned', actor_id: e.id, payload: { card: e.card } })))
+  }
   await client.from('rounds').update({ status: 'revealing' as RoundStatus }).eq('id', round.id)
   await client.from('games').update({ status: 'question_result' as GameStatus }).eq('id', gameId)
 

@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import { AvatarDisplay } from '@/components/ui/Avatar'
 import { RevealBoard } from '@/components/game/RevealBoard'
 import { ReactionBar } from '@/components/game/Reactions'
+import { PowerHand } from '@/components/game/Powers'
+import { POWER_CARDS } from '@/lib/game/powers'
 import { resultLine } from '@/lib/game/lines'
 import { sound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
@@ -68,6 +70,7 @@ export function QuestionResult({ state, onReact }: Props) {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs opacity-80">
               <span className="font-mono">{r && r.points < 0 ? `${r.points}` : `+${r?.points ?? 0}`}</span>
               {r?.streakBonus ? <span>🔥 {r.streak} in a row, +{r.streakBonus}</span> : null}
+              {r?.doubled ? <span>✌️ {r.correct ? 'Doubled' : 'Double Down cost 100'}</span> : null}
               {r?.tooFast && r.correct === false ? <span>Too fast</span> : null}
               {r?.timeMs != null && reveal.type !== 'mostlikely' && reveal.type !== 'wouldrather' && reveal.type !== 'bluff' && reveal.type !== 'sync' ? <span>{(r.timeMs / 1000).toFixed(1)}s</span> : null}
             </div>
@@ -105,6 +108,12 @@ export function QuestionResult({ state, onReact }: Props) {
           </div>
         </section>
 
+        {r?.earned && (
+          <p className="text-center text-sm text-stone-600 animate-fade-up" style={{ animationDelay: '700ms' }}>
+            Three in a row. You earned {POWER_CARDS[r.earned].emoji} {POWER_CARDS[r.earned].label}.
+          </p>
+        )}
+        <PowerHand state={state} />
         <ReactionBar onSend={onReact} />
         <p className="text-xs text-stone-400 text-center">Waiting for the host.</p>
       </div>
