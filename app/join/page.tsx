@@ -99,6 +99,13 @@ export default function JoinPage() {
 
         <InstallApp />
 
+        <p className="text-xs text-stone-400 text-center">
+          New here?{' '}
+          <a href="/manual" className="text-stone-600 underline underline-offset-4 hover:text-stone-900">
+            Read the player manual
+          </a>
+        </p>
+
         <div className="border-t border-stone-100 pt-5">
           <p className="text-xs text-stone-400 text-center mb-2">Running the game?</p>
           <button
