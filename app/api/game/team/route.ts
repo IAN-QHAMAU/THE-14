@@ -10,7 +10,8 @@ function fail(error: string, status = 400) {
 
 /**
  * Team Battle: a player picks (or switches) their side. A team's captain can
- * also rename the team and pick its icon, while the game is in the lobby.
+ * also rename the team, pick its icon and hand the badge to a teammate, while
+ * the game is in the lobby.
  */
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -21,12 +22,23 @@ export async function POST(req: NextRequest) {
   if (!game?.settings?.teams) return fail('Teams are not on in this game.')
   const db = createServerSupabase()
 
-  if (body.style) {
-    if (game.status !== 'waiting') return fail('Team names are set in the lobby.')
-    const [events, players] = await Promise.all([getEventsOfTypes(session.gameId, ['team_pick']), getPlayers(session.gameId)])
-    const team = teamsFromEvents(events)[session.playerId]
+  if (body.style || body.captain) {
+    if (game.status !== 'waiting') return fail('Team names and captains are set in the lobby.')
+    const [events, players] = await Promise.all([getEventsOfTypes(session.gameId, ['team_pick', 'team_captain']), getPlayers(session.gameId)])
+    const teams = teamsFromEvents(events.filter((e) => e.event_type === 'team_pick'))
+    const team = teams[session.playerId]
     const present = new Set(players.map((p) => p.id))
     if (!team || teamCaptains(events, present)[team] !== session.playerId) return fail('Only the team captain can do that.', 403)
+
+    // Hand the captain's badge to a teammate.
+    if (body.captain) {
+      const to = String(body.captain)
+      if (to === session.playerId) return fail('You are already captain.')
+      if (!present.has(to) || teams[to] !== team) return fail('Pick someone on your team.')
+      await db.from('events').insert({ game_id: session.gameId, event_type: 'team_captain', actor_id: session.playerId, payload: { team, to } })
+      return NextResponse.json({ success: true })
+    }
+
     const payload: Record<string, string> = { team }
     if (body.style.name !== undefined) {
       const name = tidyTeamName(body.style.name)

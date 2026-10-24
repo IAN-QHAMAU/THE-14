@@ -110,7 +110,7 @@ export function TeamPicker({ players, teams, meta, myId }: { players: Player[]; 
                 </ul>
               )}
 
-              {amCaptain && <CaptainTools meta={m} onSave={post} />}
+              {amCaptain && <CaptainTools meta={m} teammates={members.filter((p) => p.id !== myId)} onSave={post} />}
             </div>
           )
         })}
@@ -120,11 +120,32 @@ export function TeamPicker({ players, teams, meta, myId }: { players: Player[]; 
   )
 }
 
-/** The captain's controls: rename the team and pick its icon. */
-function CaptainTools({ meta, onSave }: { meta: TeamMeta; onSave: (body: Record<string, unknown>) => Promise<boolean> }) {
+/** The captain's controls: rename the team, pick its icon, or hand over the badge. */
+function CaptainTools({
+  meta,
+  teammates,
+  onSave,
+}: {
+  meta: TeamMeta
+  teammates: Player[]
+  onSave: (body: Record<string, unknown>) => Promise<boolean>
+}) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(meta.name)
   const [saving, setSaving] = useState(false)
+  // The teammate picked to take the badge, waiting for a second tap to confirm.
+  const [handTo, setHandTo] = useState<string | null>(null)
+
+  async function handOver(id: string) {
+    if (handTo !== id) {
+      setHandTo(id)
+      return
+    }
+    setSaving(true)
+    await onSave({ captain: id })
+    setSaving(false)
+    setHandTo(null)
+  }
 
   useEffect(() => {
     if (!open) setName(meta.name)
@@ -141,7 +162,7 @@ function CaptainTools({ meta, onSave }: { meta: TeamMeta; onSave: (body: Record<
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="mt-4 w-full rounded-xl border border-dashed border-stone-300 py-2.5 text-sm text-stone-600 hover:border-stone-400">
-        👑 You are captain. Name your team and pick an icon
+        👑 You are captain. Name the team, pick an icon or pass the badge
       </button>
     )
   }
@@ -175,6 +196,28 @@ function CaptainTools({ meta, onSave }: { meta: TeamMeta; onSave: (body: Record<
           </button>
         ))}
       </div>
+      {teammates.length > 0 && (
+        <div className="space-y-2 border-t border-stone-200 pt-3">
+          <p className="text-xs text-stone-500">Hand the 👑 to a teammate</p>
+          <div className="flex flex-wrap gap-2">
+            {teammates.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={saving}
+                onClick={() => void handOver(p.id)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-xs transition-colors',
+                  handTo === p.id ? 'border-stone-900 bg-stone-900 text-stone-50' : 'border-stone-200 bg-white text-stone-700 hover:border-stone-400',
+                )}
+              >
+                <AvatarDisplay avatarId={p.avatar} size="xs" />
+                {handTo === p.id ? `Tap again to make ${p.name} captain` : p.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <button type="button" onClick={() => setOpen(false)} className="w-full text-xs text-stone-500 py-1">
         Done
       </button>
