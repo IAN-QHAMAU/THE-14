@@ -270,7 +270,7 @@ export const GET_READY_MS = 3500
 export function answerWindowSeconds(type: QuestionType, timer: number, phase: RoundData['phase'] = 'vote') {
   if (type === 'bluff' && phase === 'write') return Math.max(timer, 30) + 10
   if (phase === 'wager') return 20
-  if (type === 'sketch') return Math.max(timer, 30) + 15
+  if (type === 'sketch') return 60
   if (phase === 'pick') return timer + 5
   if (type === 'order') return timer + 10
   if (type === 'closest') return timer + 5
