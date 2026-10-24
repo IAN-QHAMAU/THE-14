@@ -28,7 +28,7 @@ export async function setupGame(gameId: string, settings: GameSettings) {
 
   await client.from('rounds').delete().eq('game_id', gameId)
   await client.from('scores').delete().eq('game_id', gameId)
-  await client.from('events').delete().eq('game_id', gameId).not('event_type', 'in', '(team_pick,team_style)')
+  await client.from('events').delete().eq('game_id', gameId).not('event_type', 'in', '(team_pick,team_style,team_captain)')
   const { error: insertError } = await client.from('rounds').insert(
     questions.map((q, i) => ({
       game_id: gameId,
@@ -101,7 +101,7 @@ export async function resetGame(gameId: string) {
   const client = db()
   await client.from('rounds').delete().eq('game_id', gameId)
   await client.from('scores').delete().eq('game_id', gameId)
-  await client.from('events').delete().eq('game_id', gameId).not('event_type', 'in', '(team_pick,team_style)')
+  await client.from('events').delete().eq('game_id', gameId).not('event_type', 'in', '(team_pick,team_style,team_captain)')
   await client.from('players').update({ score: 0, streak: 0, best_streak: 0 }).eq('game_id', gameId)
   await client
     .from('games')

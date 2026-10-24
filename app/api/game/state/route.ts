@@ -102,10 +102,10 @@ export async function GET() {
 
   // Team Battle and Power-ups, read from the event log.
   const extras = game.settings?.teams || game.settings?.powerUps
-    ? await getEventsOfTypes(gameId, ['team_pick', 'team_style', 'power_earned', 'power_played'])
+    ? await getEventsOfTypes(gameId, ['team_pick', 'team_style', 'team_captain', 'power_earned', 'power_played'])
     : []
   const teams = game.settings?.teams ? teamsFromEvents(extras.filter((e) => e.event_type === 'team_pick')) : {}
-  const teamEvents = extras.filter((e) => e.event_type === 'team_pick' || e.event_type === 'team_style')
+  const teamEvents = extras.filter((e) => e.event_type.startsWith('team_'))
   const metaOfTeams = teamMeta(teamEvents, new Set(realPlayers.map((p) => p.id)))
   const powerEvents = extras.filter((e) => e.event_type.startsWith('power_'))
   const power = game.settings?.powerUps ? powerState(powerEvents) : null

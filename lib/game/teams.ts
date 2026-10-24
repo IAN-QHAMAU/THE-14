@@ -29,21 +29,38 @@ export interface TeamMeta {
 type TeamEvent = { event_type?: string; actor_id: string | null; payload: Record<string, unknown>; created_at?: string }
 
 /**
- * The captain is whoever has been on the team the longest: the first player
- * to pick that side and stay on it. If they switch away, the next one leads.
+ * The captain starts as whoever has been on the team the longest: the first
+ * player to pick that side and stay on it. A captain can hand the badge to a
+ * teammate. If the captain switches away or leaves, the badge goes back to
+ * the longest serving member.
  */
 export function teamCaptains(events: TeamEvent[], present?: Set<string>): Record<TeamId, string | null> {
   const joinedAt: Record<string, { team: TeamId; i: number }> = {}
+  const handed: Record<TeamId, string | null> = { amber: null, teal: null }
   events.forEach((e, i) => {
     const team = e.payload?.team
+    if (!isTeamId(team)) return
+    if (e.event_type === 'team_captain') {
+      const to = e.payload.to
+      if (typeof to === 'string') handed[team] = to
+      return
+    }
     if (e.event_type && e.event_type !== 'team_pick') return
-    if (!e.actor_id || !isTeamId(team)) return
-    if (present && !present.has(e.actor_id)) return
+    if (!e.actor_id || (present && !present.has(e.actor_id))) return
+    const before = joinedAt[e.actor_id]?.team
     // Picking the side you are already on does not reset your place.
-    if (joinedAt[e.actor_id]?.team !== team) joinedAt[e.actor_id] = { team, i }
+    if (before === team) return
+    // A captain who walks away gives up the badge, even if they come back.
+    if (before && handed[before] === e.actor_id) handed[before] = null
+    joinedAt[e.actor_id] = { team, i }
   })
   const out: Record<TeamId, string | null> = { amber: null, teal: null }
   for (const id of TEAM_IDS) {
+    const given = handed[id]
+    if (given && joinedAt[given]?.team === id) {
+      out[id] = given
+      continue
+    }
     const first = Object.entries(joinedAt)
       .filter(([, v]) => v.team === id)
       .sort((a, b) => a[1].i - b[1].i)[0]
