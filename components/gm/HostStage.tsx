@@ -7,9 +7,9 @@ import { GameIntro } from '@/components/game/GameIntro'
 import { RevealBoard } from '@/components/game/RevealBoard'
 import { Standings } from '@/components/game/Standings'
 import { Podium } from '@/components/game/Podium'
-import { ShareCard } from '@/components/game/ShareCard'
-import { TeamBanner, TeamBar } from '@/components/game/Teams'
-import { TEAMS, TEAM_IDS } from '@/lib/game/teams'
+import { ResultCards } from '@/components/game/ShareCard'
+import { TeamCrest, TeamFinale, TeamStandings } from '@/components/game/Teams'
+import { TEAM_IDS, battleOf } from '@/lib/game/teams'
 import { PromptExtras } from '@/components/game/answers'
 import { SketchStage } from '@/components/game/Sketch'
 import { CATEGORIES, GAME_TYPES, GROUP_TINT } from '@/lib/game/questions/schema'
@@ -50,20 +50,13 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
             <span className="text-stone-400">
               <span className="text-stone-100 font-medium">{players.length}</span> of {seats} joined
             </span>
-            {game.settings?.teams && (
-              <span className="hidden sm:flex items-center gap-3 text-stone-400">
-                {TEAM_IDS.map((id) => (
-                  <span key={id} className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TEAMS[id].colour }} />
-                    {players.filter((p) => state.teams[p.id] === id).length}
-                  </span>
-                ))}
-              </span>
-            )}
             <span className={cn('transition-colors', here >= 2 ? 'text-accent' : 'text-stone-500')}>
               {here === 0 ? 'Waiting for the first player' : here === 1 ? 'One more and you can start' : 'Ready when you are'}
             </span>
           </div>
+          {game.settings?.teams ? (
+            <TeamLobby state={state} size={size} />
+          ) : (
           <div className="grid grid-cols-4 sm:grid-cols-7 gap-x-3 gap-y-5">
             {Array.from({ length: seats }).map((_, i) => {
               const p = players[i]
@@ -77,20 +70,19 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
               }
               return (
                 <div key={p.id} className="flex flex-col items-center gap-1.5 min-w-0 animate-seat-in">
-                  <span className="rounded-full p-[3px]" style={state.teams[p.id] ? { boxShadow: `0 0 0 3px ${TEAMS[state.teams[p.id]].colour}` } : undefined}>
-                    <AvatarDisplay
-                      avatarId={p.avatar}
-                      size={size === 'stage' ? 'lg' : 'md'}
-                      idle={p.is_connected}
-                      style={{ animationDelay: `${-i * 0.9}s` }}
-                      className={cn(!p.is_connected && 'opacity-40')}
-                    />
-                  </span>
+                  <AvatarDisplay
+                    avatarId={p.avatar}
+                    size={size === 'stage' ? 'lg' : 'md'}
+                    idle={p.is_connected}
+                    style={{ animationDelay: `${-i * 0.9}s` }}
+                    className={cn(!p.is_connected && 'opacity-40')}
+                  />
                   <span className={cn('text-sm truncate max-w-full', p.is_connected ? 'text-stone-200' : 'text-stone-500')}>{p.name}</span>
                 </div>
               )
             })}
           </div>
+          )}
         </div>
       </div>
     )
@@ -101,25 +93,40 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
   if (game.status === 'leaderboard') {
     return (
       <div className="w-full max-w-3xl mx-auto">
-        {game.settings?.teams && <div className="mb-6"><TeamBar scores={state.scores} teams={state.teams} size={size} /></div>}
-        <Standings
-          scores={state.scores}
-          lastReveal={state.lastReveal}
-          size={size}
-          limit={10}
-          subtitle={`After question ${game.current_round} of ${game.total_questions}`}
-        />
+        {game.settings?.teams ? (
+          <TeamStandings scores={state.scores} teams={state.teams} meta={state.teamMeta} size={size} subtitle={`After question ${game.current_round} of ${game.total_questions}.`} />
+        ) : (
+          <Standings
+            scores={state.scores}
+            lastReveal={state.lastReveal}
+            size={size}
+            limit={10}
+            subtitle={`After question ${game.current_round} of ${game.total_questions}`}
+          />
+        )}
       </div>
     )
   }
 
   if (game.status === 'finished') {
     return (
-      <Podium scores={state.scores} awards={state.awards} tags={state.tags} size={size}>
-        {game.settings?.teams && <TeamBanner scores={state.scores} teams={state.teams} size={size} />}
+      <Podium
+        scores={state.scores}
+        awards={state.awards}
+        tags={state.tags}
+        size={size}
+        hero={game.settings?.teams ? <TeamFinale scores={state.scores} teams={state.teams} meta={state.teamMeta} size={size} /> : undefined}
+      >
         <div className="max-w-xs mx-auto w-full space-y-2">
-          <p className="text-xs tracking-widest uppercase text-stone-500 text-center">Group results card</p>
-          <ShareCard mode="group" scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
+          <p className="text-xs tracking-widest uppercase text-stone-500 text-center">{game.settings?.teams ? 'Results cards' : 'Group results card'}</p>
+          <ResultCards
+            mode="group"
+            scores={state.scores}
+            awards={state.awards}
+            tags={state.tags}
+            stats={state.stats}
+            battle={game.settings?.teams ? battleOf(state.scores, state.teams, state.teamMeta) : undefined}
+          />
         </div>
       </Podium>
     )
@@ -284,6 +291,61 @@ export function HostStage({ state, joinUrl }: { state: GameStateResponse; joinUr
             : `${state.answeredCount} of ${spot ? Math.max(1, players.length - 1) : players.length} ${isWrite ? 'written' : phase === 'wager' ? 'bets in' : q.type === 'sketch' ? 'got it' : 'answered'}`}
         </span>
       </div>
+    </div>
+  )
+}
+
+/** The lobby in a Team Battle: the two teams side by side, filling up. */
+function TeamLobby({ state, size }: { state: GameStateResponse; size: 'phone' | 'stage' }) {
+  const players = state.players.filter((p) => !p.is_game_master)
+  const loose = players.filter((p) => !state.teams[p.id])
+  return (
+    <div className="space-y-4">
+      <div className="grid sm:grid-cols-2 gap-4">
+        {TEAM_IDS.map((id) => {
+          const m = state.teamMeta[id]
+          const members = players.filter((p) => state.teams[p.id] === id)
+          const captain = members.find((p) => p.id === m.captainId)
+          return (
+            <div
+              key={id}
+              className="rounded-3xl border p-5 space-y-4"
+              style={{ borderColor: `${m.colour}55`, background: `radial-gradient(120% 90% at 0% 0%, ${m.colour}26, transparent 60%), #1c1917` }}
+            >
+              <div className="flex items-center gap-4">
+                <TeamCrest meta={m} size={size === 'stage' ? 'lg' : 'md'} />
+                <div className="min-w-0">
+                  <p className={cn('font-medium text-stone-50 truncate', size === 'stage' ? 'text-3xl' : 'text-xl')}>{m.name}</p>
+                  <p className="text-sm text-stone-400">
+                    {members.length} {members.length === 1 ? 'player' : 'players'}
+                    {captain ? ` · 👑 ${captain.name}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-x-2 gap-y-3 min-h-[4rem]">
+                {members.map((p, i) => (
+                  <div key={p.id} className="flex flex-col items-center gap-1 min-w-0 animate-seat-in">
+                    <span className="relative">
+                      <AvatarDisplay avatarId={p.avatar} size={size === 'stage' ? 'lg' : 'md'} idle={p.is_connected} style={{ animationDelay: `${-i * 0.9}s` }} className={cn(!p.is_connected && 'opacity-40')} />
+                      {p.id === m.captainId && <span className="absolute -top-2 -right-1 text-base">👑</span>}
+                    </span>
+                    <span className="text-xs text-stone-300 truncate max-w-full">{p.name}</span>
+                  </div>
+                ))}
+                {!members.length && <p className="col-span-4 text-sm text-stone-500">Nobody yet.</p>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {loose.length > 0 && (
+        <div className="flex items-center gap-3 text-sm text-stone-400">
+          <div className="flex -space-x-2">
+            {loose.map((p) => <AvatarDisplay key={p.id} avatarId={p.avatar} size="sm" className="ring-2 ring-stone-900" />)}
+          </div>
+          Still picking. Anyone left joins the smaller team.
+        </div>
+      )}
     </div>
   )
 }

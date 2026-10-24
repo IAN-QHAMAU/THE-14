@@ -13,7 +13,7 @@ import {
   getEventsOfTypes,
   toScoreEntries,
 } from '@/lib/db/queries'
-import { teamsFromEvents } from '@/lib/game/teams'
+import { teamMeta, teamsFromEvents } from '@/lib/game/teams'
 import { powerLine, powerState } from '@/lib/game/powers'
 import { getQuestionById, phaseAction, toPublicQuestion } from '@/lib/game/questions'
 import { createServerSupabase } from '@/lib/db/supabase'
@@ -102,10 +102,12 @@ export async function GET() {
 
   // Team Battle and Power-ups, read from the event log.
   const extras = game.settings?.teams || game.settings?.powerUps
-    ? await getEventsOfTypes(gameId, ['team_pick', 'power_earned', 'power_played'])
+    ? await getEventsOfTypes(gameId, ['team_pick', 'team_style', 'power_earned', 'power_played'])
     : []
   const teams = game.settings?.teams ? teamsFromEvents(extras.filter((e) => e.event_type === 'team_pick')) : {}
-  const powerEvents = extras.filter((e) => e.event_type !== 'team_pick')
+  const teamEvents = extras.filter((e) => e.event_type === 'team_pick' || e.event_type === 'team_style')
+  const metaOfTeams = teamMeta(teamEvents, new Set(realPlayers.map((p) => p.id)))
+  const powerEvents = extras.filter((e) => e.event_type.startsWith('power_'))
   const power = game.settings?.powerUps ? powerState(powerEvents) : null
   const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? 'Someone'
   const fx = power && round ? power.effects[round.round_number] : undefined
@@ -131,6 +133,7 @@ export async function GET() {
         ? question.word
         : null,
     teams,
+    teamMeta: metaOfTeams,
     myCard: power && !isGameMaster ? power.held[playerId] ?? null : null,
     myEffects: fx && !isGameMaster
       ? { frozen: fx.frozen.includes(playerId), shuffled: fx.shuffled.includes(playerId), doubled: fx.doubled.includes(playerId) }

@@ -8,8 +8,9 @@ import { QuestionScreen, type SubmitBody } from '@/components/game/QuestionScree
 import { QuestionResult } from '@/components/game/QuestionResult'
 import { Standings } from '@/components/game/Standings'
 import { Podium } from '@/components/game/Podium'
-import { ShareCard } from '@/components/game/ShareCard'
-import { TeamBanner, TeamBar } from '@/components/game/Teams'
+import { ResultCards } from '@/components/game/ShareCard'
+import { battleOf } from '@/lib/game/teams'
+import { TeamFinale, TeamStandings } from '@/components/game/Teams'
 import { PowerHand, PowerToast } from '@/components/game/Powers'
 import { ReactionBar, ReactionLayer, useReactions } from '@/components/game/Reactions'
 import { SoundToggle } from '@/components/ui/SoundToggle'
@@ -86,7 +87,7 @@ export default function RoomPage() {
     const { game, myPlayer } = state
 
     if (game.status === 'waiting') {
-      return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} teams={state.teams} />
+      return <WaitingRoom game={game} players={state.players} myPlayer={myPlayer} teams={state.teams} teamMeta={state.teamMeta} />
     }
 
     // The host closed this lobby before it started (usually for a new game).
@@ -113,12 +114,25 @@ export default function RoomPage() {
       return (
         <Dark>
           <ReactionLayer items={items} />
-          <Podium scores={state.scores} awards={state.awards} tags={state.tags} myPlayerId={myPlayer?.id}>
+          <Podium
+            scores={state.scores}
+            awards={state.awards}
+            tags={state.tags}
+            myPlayerId={myPlayer?.id}
+            hero={game.settings?.teams ? <TeamFinale scores={state.scores} teams={state.teams} meta={state.teamMeta} myId={myPlayer?.id} /> : undefined}
+          >
             <div className="space-y-6">
-              {game.settings?.teams && <TeamBanner scores={state.scores} teams={state.teams} />}
               <ReactionBar onSend={send} dark />
               {meEntry && (
-                <ShareCard mode="player" me={meEntry} scores={state.scores} awards={state.awards} tags={state.tags} stats={state.stats} />
+                <ResultCards
+                  mode="player"
+                  me={meEntry}
+                  scores={state.scores}
+                  awards={state.awards}
+                  tags={state.tags}
+                  stats={state.stats}
+                  battle={game.settings?.teams ? battleOf(state.scores, state.teams, state.teamMeta) : undefined}
+                />
               )}
               <button type="button" onClick={toJoin} className="w-full text-xs text-stone-500 underline underline-offset-4 hover:text-stone-300">
                 Join another game
@@ -143,13 +157,22 @@ export default function RoomPage() {
         <Dark>
           <ReactionLayer items={items} />
           <div className="space-y-8">
-            {game.settings?.teams && <TeamBar scores={state.scores} teams={state.teams} />}
-            <Standings
-              scores={state.scores}
-              lastReveal={state.lastReveal}
-              myPlayerId={myPlayer?.id}
-              subtitle={`After question ${game.current_round} of ${game.total_questions}`}
-            />
+            {game.settings?.teams ? (
+              <TeamStandings
+                scores={state.scores}
+                teams={state.teams}
+                meta={state.teamMeta}
+                myId={myPlayer?.id}
+                subtitle={`After question ${game.current_round} of ${game.total_questions}.`}
+              />
+            ) : (
+              <Standings
+                scores={state.scores}
+                lastReveal={state.lastReveal}
+                myPlayerId={myPlayer?.id}
+                subtitle={`After question ${game.current_round} of ${game.total_questions}`}
+              />
+            )}
             <PowerHand state={state} dark />
             <ReactionBar onSend={send} dark />
           </div>

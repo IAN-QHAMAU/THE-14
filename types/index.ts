@@ -102,6 +102,8 @@ export interface GameStateResponse {
   myWord: string | null
   /** Team Battle: each player's side. */
   teams: Record<string, 'amber' | 'teal'>
+  /** Team Battle: each team's name, icon, colour and captain. */
+  teamMeta: Record<'amber' | 'teal', { name: string; icon: string; colour: string; captainId: string | null }>
   /** Power-ups: the card you hold, what is active on you this question, and the recent plays. */
   myCard: 'freeze' | 'steal' | 'shuffle' | 'shield' | 'double' | null
   myEffects: { frozen: boolean; shuffled: boolean; doubled: boolean } | null

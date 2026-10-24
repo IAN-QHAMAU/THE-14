@@ -4,16 +4,17 @@ import type { Player, Game } from '@/types'
 import { AvatarDisplay } from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import { TeamPicker } from '@/components/game/Teams'
-import type { TeamId } from '@/lib/game/teams'
+import { DEFAULT_TEAM_META, type TeamId, type TeamMeta } from '@/lib/game/teams'
 
 interface Props {
   game: Game
   players: Player[]
   myPlayer: Player | null
   teams?: Record<string, TeamId>
+  teamMeta?: Record<TeamId, TeamMeta>
 }
 
-export function WaitingRoom({ game, players, myPlayer, teams = {} }: Props) {
+export function WaitingRoom({ game, players, myPlayer, teams = {}, teamMeta = DEFAULT_TEAM_META }: Props) {
   const realPlayers = players.filter((player) => !player.is_game_master)
   const count = realPlayers.length
   const max = game.max_players
@@ -43,7 +44,7 @@ export function WaitingRoom({ game, players, myPlayer, teams = {} }: Props) {
           </section>
         )}
 
-        {game.settings?.teams && <TeamPicker players={players} teams={teams} myId={myPlayer?.id} />}
+        {game.settings?.teams && <TeamPicker players={players} teams={teams} meta={teamMeta} myId={myPlayer?.id} />}
 
         <section>
           <div className="flex items-baseline justify-between mb-4">
