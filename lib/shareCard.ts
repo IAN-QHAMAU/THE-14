@@ -1032,25 +1032,32 @@ async function teamCard(c: Ctx, input: ShareCardInput) {
     x += chipW[i] + gapX
   })
 
-  // The winners on a curved stage: the MVP in the middle, the rest fanning out.
+  // The winners on a curved stage, always centred. With an odd number the MVP
+  // stands in the middle; with an even number the MVP and the runner up share
+  // the middle as a pair. Everyone else fans out evenly on both sides.
   const stageTop = chipY + 150
   const shown = winners.slice(0, 9)
-  const order: PlayerScoreEntry[] = []
-  shown.forEach((s, i) => (i % 2 ? order.unshift(s) : order.push(s)))
-  const n = order.length
-  const spread = Math.min(150, (CARD.w - 140) / Math.max(1, n))
-  for (let i = 0; i < n; i++) {
-    const s = order[i]
-    const off = i - (n - 1) / 2
-    const isMvp = s === mvp && s.total > 0 && !tie
-    const sz = isMvp ? 168 : Math.max(96, 128 - Math.abs(off) * 6)
-    const cx = W / 2 + off * spread
-    const top = stageTop + Math.abs(off) * Math.abs(off) * 7 + (isMvp ? -20 : 18)
+  const n = shown.length
+  const hasMvp = !tie && Boolean(mvp && mvp.total > 0)
+  const spread = n === 2 ? 180 : Math.min(150, (CARD.w - 140) / Math.max(1, n))
+  // Slots from the middle outward: 0, -1, 1, -2, 2 (odd) or -0.5, 0.5, -1.5, 1.5 (even).
+  const slots = Array.from({ length: n }, (_, i) => i - (n - 1) / 2).sort((a, b) => Math.abs(a) - Math.abs(b) || a - b)
+  const seats = shown.map((s, i) => ({ s, x: slots[i] * spread, depth: Math.abs(slots[i]), mvp: hasMvp && i === 0, second: hasMvp && n % 2 === 0 && i === 1 }))
+  const gapOf = (x: number) => Math.min(...seats.filter((o) => o.x !== x).map((o) => Math.abs(o.x - x)), 200)
+  // Outer seats first, so the middle ones sit on top.
+  for (const seatInfo of [...seats].sort((a, b) => b.depth - a.depth || Number(a.mvp) - Number(b.mvp))) {
+    const { s, x, depth, mvp: isMvp, second } = seatInfo
+    const room = gapOf(x)
+    const sz = isMvp ? 168 : second ? 146 : Math.max(96, 128 - depth * 6)
+    const cx = W / 2 + x
+    // The middle pair stand level; everyone else steps down along the curve.
+    const step = n % 2 === 0 ? Math.max(0, depth - 0.5) : depth
+    const top = stageTop + step * step * 7 + (isMvp ? -20 : second ? -2 : 18)
     await seat(c, s, cx, top, sz, win.colour, tie ? null : 'happy', isMvp)
     ctx.textAlign = 'center'
     ctx.fillStyle = isMvp ? C.text : C.soft
     ctx.font = `${isMvp ? 600 : 500} ${isMvp ? 28 : 22}px ${font}`
-    ctx.fillText(fitText(ctx, s.name, spread + (isMvp ? 40 : -6)), cx, top + sz + 44)
+    ctx.fillText(fitText(ctx, s.name, room + (isMvp ? 40 : -6)), cx, top + sz + 44)
     ctx.fillStyle = isMvp ? `#${lighten(wc, 0.2)}` : C.muted
     ctx.font = `500 ${isMvp ? 24 : 20}px ui-monospace, monospace`
     ctx.fillText(s.total.toLocaleString(), cx, top + sz + 76)
